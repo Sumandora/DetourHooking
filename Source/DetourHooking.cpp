@@ -59,8 +59,11 @@ MemoryPage* FindMemory(const void* preferredLocation, const size_t instructionLe
 		long distance = PointerDistance(memoryPage.location, preferredLocation);
 		if (GetPageSize() - memoryPage.offset >=
 			instructionLength + relJmpLength + (distance > relJmpDistance ? absJmpLength : 0))
-			if (distance <= relJmpDistance)
+			if (distance <= relJmpDistance) {
+				// We used this one before, it should be read-only
+				Protect(memoryPage.location, GetPageSize(), PROT_READ | PROT_WRITE | PROT_EXEC);
 				return &memoryPage;
+			}
 	}
 
 	void* newLocation = FindUnusedMemory(preferredLocation);
@@ -114,20 +117,23 @@ Hook::Hook(void* original, void* hook, size_t instructionLength) {
 
 	needsAbsoluteJmp = PointerDistance(hook, original) > relJmpDistance;
 
-	if (needsAbsoluteJmp) {
+	if (needsAbsoluteJmp) { // Relative jumps can only cover +/- 2 GB, in case that isn't enough we write an absolute jump
 		absJmp = reinterpret_cast<char*>(memoryPage->location) + offset;
 		WriteAbsJmp(absJmp, hook);
 		offset += absJmpLength;
 	}
 
-	memcpy(reinterpret_cast<char*>(memoryPage->location) + offset, original, instructionLength);
+	memcpy(reinterpret_cast<char*>(memoryPage->location) + offset, original, instructionLength); // Stolen bytes
 	offset += instructionLength;
 
 	WriteRelJmp(reinterpret_cast<char*>(memoryPage->location) + offset,
-				reinterpret_cast<char*>(original) + relJmpLength);
+				reinterpret_cast<char*>(original) + relJmpLength); // Back to the original
 	offset += relJmpLength;
 
 	trampoline = reinterpret_cast<char*>(memoryPage->location) + originalOffset + (needsAbsoluteJmp ? absJmpLength : 0);
+
+	// We are done here, make it read-only
+	Protect(memoryPage->location, GetPageSize(), PROT_READ | PROT_EXEC);
 
 	error = DETOURHOOKING_SUCCESS;
 }

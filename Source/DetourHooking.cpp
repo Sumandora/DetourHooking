@@ -27,7 +27,7 @@ void Protect(const void* addr, const size_t length, const int prot) {
 	mprotect(aligned, length - (length % pagesize) + pagesize, prot);
 }
 
-long PointerDistance(const void* a, const void* b) {
+int64_t PointerDistance(const void* a, const void* b) {
 	return std::abs(reinterpret_cast<const char*>(b) - reinterpret_cast<const char*>(a));
 }
 

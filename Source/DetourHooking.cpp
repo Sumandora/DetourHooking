@@ -27,7 +27,7 @@ void Protect(const void* addr, const size_t length, const int prot) {
 	mprotect(aligned, length - (length % pagesize) + pagesize, prot);
 }
 
-int64_t PointerDistance(const void* a, const void* b) {
+uint64_t PointerDistance(const void* a, const void* b) {
 	return std::abs(reinterpret_cast<const char*>(b) - reinterpret_cast<const char*>(a));
 }
 
@@ -56,7 +56,7 @@ MemoryPage* FindMemory(const void* preferredLocation, const size_t instructionLe
 	static std::vector<MemoryPage> pages;
 
 	for (MemoryPage& memoryPage: pages) {
-		long distance = PointerDistance(memoryPage.location, preferredLocation);
+		uint64_t distance = PointerDistance(memoryPage.location, preferredLocation);
 		if (GetPageSize() - memoryPage.offset >=
 			instructionLength + relJmpLength + (distance > relJmpDistance ? absJmpLength : 0))
 			if (distance <= relJmpDistance) {

@@ -1,7 +1,7 @@
 #ifndef DETOURHOOKING
 #define DETOURHOOKING
 
-#include <optional>
+#include <unistd.h>
 
 #define DETOURHOOKING_MIN_LENGTH 5 // The length of an x86-64 near jmp
 

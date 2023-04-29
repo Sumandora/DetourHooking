@@ -1,33 +1,36 @@
 #include "DetourHooking.hpp"
 
-#include <unistd.h>
-#include <cstdint>
 #include <cmath>
-#include <sys/mman.h>
-#include <vector>
+#include <cstdint>
 #include <cstring>
-#include <cstdio>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <vector>
 
 constexpr size_t relJmpDistance = INT32_MAX;
 constexpr size_t relJmpLength = 5; // The length of an x86-64 relative jmp
 constexpr size_t absJmpLength = 12; // The length of an x86-64 absolute jmp
 
-size_t GetPageSize() {
-	static size_t pageSize = getpagesize();
+size_t GetPageSize()
+{
+	static const size_t pageSize = getpagesize();
 	return pageSize;
 }
 
-void* Align(const void* addr, const size_t alignment) {
-	return (void*) (((size_t) addr) & ~(alignment - 1));
+void* Align(const void* addr, const size_t alignment)
+{
+	return (void*)(((size_t)addr) & ~(alignment - 1));
 }
 
-void Protect(const void* addr, const size_t length, const int prot) {
+void Protect(const void* addr, const size_t length, const int prot)
+{
 	const size_t pagesize = GetPageSize();
 	void* aligned = Align(addr, pagesize);
 	mprotect(aligned, length - (length % pagesize) + pagesize, prot);
 }
 
-uint64_t PointerDistance(const void* a, const void* b) {
+uint64_t PointerDistance(const void* a, const void* b)
+{
 	return std::abs(reinterpret_cast<const char*>(b) - reinterpret_cast<const char*>(a));
 }
 
@@ -36,29 +39,30 @@ struct MemoryPage {
 	size_t offset; // How much has been written there?
 };
 
-void* FindUnusedMemory(const void* preferredLocation) {
+void* FindUnusedMemory(const void* preferredLocation)
+{
 	for (size_t offset = 0; offset <= relJmpDistance; offset += GetPageSize())
 		for (int sign = -1; sign <= 2; sign += 2) {
 			void* pointer = mmap(
-					reinterpret_cast<char*>(Align(preferredLocation, GetPageSize())) + offset * sign,
-					GetPageSize(),
-					PROT_READ | PROT_WRITE | PROT_EXEC,
-					MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE,
-					-1,
-					0);
+				reinterpret_cast<char*>(Align(preferredLocation, GetPageSize())) + offset * sign,
+				GetPageSize(),
+				PROT_READ | PROT_WRITE | PROT_EXEC,
+				MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE,
+				-1,
+				0);
 			if (pointer != MAP_FAILED)
 				return pointer;
 		}
 	return nullptr;
 }
 
-MemoryPage* FindMemory(const void* preferredLocation, const size_t instructionLength) {
+MemoryPage* FindMemory(const void* preferredLocation, const size_t instructionLength)
+{
 	static std::vector<MemoryPage> pages;
 
-	for (MemoryPage& memoryPage: pages) {
-		uint64_t distance = PointerDistance(memoryPage.location, preferredLocation);
-		if (GetPageSize() - memoryPage.offset >=
-			instructionLength + relJmpLength + (distance > relJmpDistance ? absJmpLength : 0))
+	for (MemoryPage& memoryPage : pages) {
+		const uint64_t distance = PointerDistance(memoryPage.location, preferredLocation);
+		if (GetPageSize() - memoryPage.offset >= instructionLength + relJmpLength + (distance > relJmpDistance ? absJmpLength : 0))
 			if (distance <= relJmpDistance) {
 				// We used this one before, it should be read-only
 				Protect(memoryPage.location, GetPageSize(), PROT_READ | PROT_WRITE | PROT_EXEC);
@@ -76,31 +80,32 @@ MemoryPage* FindMemory(const void* preferredLocation, const size_t instructionLe
 		return nullptr;
 	}
 
-	return &pages.emplace_back(MemoryPage{newLocation, 0});
+	return &pages.emplace_back(MemoryPage { newLocation, 0 });
 }
 
-void WriteRelJmp(void* location, const void* target) {
+void WriteRelJmp(void* location, const void* target)
+{
 	unsigned char jmpInstruction[] = {
-			0xE9, 0x0, 0x0, 0x0, 0x0 // jmp goal
+		0xE9, 0x0, 0x0, 0x0, 0x0 // jmp goal
 	};
 	// Calculation for a relative jmp
-	void* jmpTarget = reinterpret_cast<void*>(reinterpret_cast<const char*>(target) -
-											  (reinterpret_cast<char*>(location) +
-											   relJmpLength)); // Jumps always start at the rip, which has already increased
+	void* jmpTarget = reinterpret_cast<void*>(reinterpret_cast<const char*>(target) - (reinterpret_cast<char*>(location) + relJmpLength)); // Jumps always start at the rip, which has already increased
 	memcpy(jmpInstruction + 1, &jmpTarget, relJmpLength - 1 /* E9 */);
 	memcpy(location, jmpInstruction, relJmpLength);
 }
 
-void WriteAbsJmp(void* location, const void* target) {
+void WriteAbsJmp(void* location, const void* target)
+{
 	unsigned char absJumpInstructions[] = {
-			0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // mov rax, goal
-			0xFF, 0xE0 // jmp rax
+		0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // mov rax, goal
+		0xFF, 0xE0 // jmp rax
 	};
 	memcpy(absJumpInstructions + 2, &target, sizeof(void*));
 	memcpy(location, absJumpInstructions, absJmpLength);
 }
 
-Hook::Hook(void* original, void* hook, size_t instructionLength) {
+Hook::Hook(void* original, void* hook, size_t instructionLength)
+{
 	this->original = original;
 	this->hook = hook;
 	this->instructionLength = instructionLength;
@@ -112,7 +117,7 @@ Hook::Hook(void* original, void* hook, size_t instructionLength) {
 	if (!memoryPage)
 		error = DETOURHOOKING_OUT_OF_MEMORY;
 
-	size_t originalOffset = memoryPage->offset;
+	const size_t originalOffset = memoryPage->offset;
 	size_t& offset = memoryPage->offset;
 
 	needsAbsoluteJmp = PointerDistance(hook, original) > relJmpDistance;
@@ -127,7 +132,7 @@ Hook::Hook(void* original, void* hook, size_t instructionLength) {
 	offset += instructionLength;
 
 	WriteRelJmp(reinterpret_cast<char*>(memoryPage->location) + offset,
-				reinterpret_cast<char*>(original) + relJmpLength); // Back to the original
+		reinterpret_cast<char*>(original) + relJmpLength); // Back to the original
 	offset += relJmpLength;
 
 	trampoline = reinterpret_cast<char*>(memoryPage->location) + originalOffset + (needsAbsoluteJmp ? absJmpLength : 0);
@@ -138,8 +143,10 @@ Hook::Hook(void* original, void* hook, size_t instructionLength) {
 	error = DETOURHOOKING_SUCCESS;
 }
 
-void Hook::Enable() {
-	if (error) return;
+void Hook::Enable()
+{
+	if (error)
+		return;
 
 	Protect(original, instructionLength, PROT_READ | PROT_WRITE | PROT_EXEC);
 
@@ -154,8 +161,10 @@ void Hook::Enable() {
 	Protect(original, instructionLength, PROT_READ | PROT_EXEC);
 }
 
-void Hook::Disable() {
-	if (error) return;
+void Hook::Disable()
+{
+	if (error)
+		return;
 
 	Protect(original, instructionLength, PROT_READ | PROT_WRITE | PROT_EXEC);
 

@@ -1,43 +1,48 @@
-#include <iostream>
 #include <cassert>
+#include <iostream>
 
 #include "DetourHooking.hpp"
 
-long Factorial(long a) {
+long Factorial(long a)
+{
 	long b = a;
 	for (long i = 2; i < a; i++)
 		b *= i;
 	return b;
 }
 
-typedef long(* FactorialFunc)(long);
+typedef long (*FactorialFunc)(long);
 
 Hook* factorialHook;
 
-long MyFactorial(long a) {
+long MyFactorial(long a)
+{
 	return reinterpret_cast<FactorialFunc>(factorialHook->trampoline)(a) + 123;
 }
 
-long Sum(long a, long b) {
+long Sum(long a, long b)
+{
 	return a + b;
 }
 
-typedef long(* SumFunc)(long, long);
+typedef long (*SumFunc)(long, long);
 
 Hook* sumHook;
 
-long MySum(long a, long b) {
+long MySum(long a, long b)
+{
 	return reinterpret_cast<SumFunc>(sumHook->trampoline)(a, b) + 123;
 }
 
-int main() {
+int main()
+{
 	{
 		printf("5! = %ld\n", Factorial(5));
 		assert(120 == Factorial(5));
 
 		factorialHook = new Hook(reinterpret_cast<void*>(Factorial),
-								 reinterpret_cast<void*>(MyFactorial),
-								 8);
+			reinterpret_cast<void*>(MyFactorial),
+			8);
 		factorialHook->Enable();
 		assert(factorialHook->error == DETOURHOOKING_SUCCESS);
 		printf("Hooked Factorial\n");
@@ -51,8 +56,8 @@ int main() {
 		assert(7 == Sum(2, 5));
 
 		sumHook = new Hook(reinterpret_cast<void*>(Sum),
-						   reinterpret_cast<void*>(MySum),
-						   8);
+			reinterpret_cast<void*>(MySum),
+			8);
 		sumHook->Enable();
 		assert(sumHook->error == DETOURHOOKING_SUCCESS);
 		printf("Hooked Sum\n");

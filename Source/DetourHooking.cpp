@@ -22,17 +22,17 @@ void* Align(const void* addr, const size_t alignment)
 	return (void*)(((size_t)addr) & ~(alignment - 1));
 }
 
+uint64_t PointerDistance(const void* a, const void* b)
+{
+	return std::abs(reinterpret_cast<const char*>(b) - reinterpret_cast<const char*>(a));
+}
+
 void Protect(const void* addr, const size_t length, const int prot)
 {
 	const size_t pagesize = GetPageSize();
 	void* aligned = Align(addr, pagesize);
-	const size_t alignDifference = (char*)addr - (char*)aligned;
+	const size_t alignDifference = PointerDistance(addr, aligned);
 	mprotect(aligned, alignDifference + length, prot);
-}
-
-uint64_t PointerDistance(const void* a, const void* b)
-{
-	return std::abs(reinterpret_cast<const char*>(b) - reinterpret_cast<const char*>(a));
 }
 
 struct MemoryPage {

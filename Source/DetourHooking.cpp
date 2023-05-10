@@ -111,12 +111,16 @@ Hook::Hook(void* original, void* hook, size_t instructionLength)
 	this->hook = hook;
 	this->instructionLength = instructionLength;
 
-	if (instructionLength < DETOURHOOKING_MIN_LENGTH)
+	if (instructionLength < DETOURHOOKING_MIN_LENGTH) {
 		error = DETOURHOOKING_INSUFFICIENT_LENGTH; // We won't be able to fit a near jmp
+		return;
+	}
 
 	MemoryPage* memoryPage = FindMemory(original, instructionLength);
-	if (!memoryPage)
+	if (!memoryPage) {
 		error = DETOURHOOKING_OUT_OF_MEMORY;
+		return;
+	}
 
 	const size_t originalOffset = memoryPage->offset;
 	size_t& offset = memoryPage->offset;

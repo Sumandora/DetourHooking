@@ -11,23 +11,23 @@ constexpr size_t relJmpDistance = INT32_MAX;
 constexpr size_t relJmpLength = 5; // The length of an x86-64 relative jmp
 constexpr size_t absJmpLength = 12; // The length of an x86-64 absolute jmp
 
-size_t GetPageSize()
+static size_t GetPageSize()
 {
 	static const size_t pageSize = getpagesize();
 	return pageSize;
 }
 
-void* Align(const void* addr, const size_t alignment)
+static void* Align(const void* addr, const size_t alignment)
 {
 	return (void*)(((size_t)addr) & ~(alignment - 1));
 }
 
-uint64_t PointerDistance(const void* a, const void* b)
+static uint64_t PointerDistance(const void* a, const void* b)
 {
 	return std::abs(reinterpret_cast<const char*>(b) - reinterpret_cast<const char*>(a));
 }
 
-void Protect(const void* addr, const size_t length, const int prot)
+static void Protect(const void* addr, const size_t length, const int prot)
 {
 	const size_t pagesize = GetPageSize();
 	void* aligned = Align(addr, pagesize);
@@ -40,7 +40,7 @@ struct MemoryPage {
 	size_t offset; // How much has been written there?
 };
 
-void* FindUnusedMemory(const void* preferredLocation)
+static void* FindUnusedMemory(const void* preferredLocation)
 {
 	for (size_t offset = 0; offset <= relJmpDistance; offset += GetPageSize())
 		for (int sign = -1; sign <= 2; sign += 2) {
@@ -57,7 +57,7 @@ void* FindUnusedMemory(const void* preferredLocation)
 	return nullptr;
 }
 
-MemoryPage* FindMemory(const void* preferredLocation, const size_t instructionLength)
+static MemoryPage* FindMemory(const void* preferredLocation, const size_t instructionLength)
 {
 	static std::vector<MemoryPage> pages;
 
@@ -84,7 +84,7 @@ MemoryPage* FindMemory(const void* preferredLocation, const size_t instructionLe
 	return &pages.emplace_back(MemoryPage { newLocation, 0 });
 }
 
-void WriteRelJmp(void* location, const void* target)
+static void WriteRelJmp(void* location, const void* target)
 {
 	unsigned char jmpInstruction[] = {
 		0xE9, 0x0, 0x0, 0x0, 0x0 // jmp goal
@@ -95,7 +95,7 @@ void WriteRelJmp(void* location, const void* target)
 	memcpy(location, jmpInstruction, relJmpLength);
 }
 
-void WriteAbsJmp(void* location, const void* target)
+static void WriteAbsJmp(void* location, const void* target)
 {
 	unsigned char absJumpInstructions[] = {
 		0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // mov rax, goal

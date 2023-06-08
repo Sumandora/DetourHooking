@@ -3,6 +3,12 @@
 
 #include "DetourHooking.hpp"
 
+typedef long (*FactorialFunc)(long);
+typedef long (*SumFunc)(long, long);
+
+DetourHooking::Hook* factorialHook;
+DetourHooking::Hook* sumHook;
+
 long Factorial(long a)
 {
 	long b = a;
@@ -11,23 +17,15 @@ long Factorial(long a)
 	return b;
 }
 
-typedef long (*FactorialFunc)(long);
-
-Hook* factorialHook;
-
-long MyFactorial(long a)
-{
-	return reinterpret_cast<FactorialFunc>(factorialHook->trampoline)(a) + 123;
-}
-
 long Sum(long a, long b)
 {
 	return a + b;
 }
 
-typedef long (*SumFunc)(long, long);
-
-Hook* sumHook;
+long MyFactorial(long a)
+{
+	return reinterpret_cast<FactorialFunc>(factorialHook->trampoline)(a) + 123;
+}
 
 long MySum(long a, long b)
 {
@@ -36,36 +34,35 @@ long MySum(long a, long b)
 
 int main()
 {
+	printf("------- Hooking Factorial -------\n");
 	{
 		printf("5! = %ld\n", Factorial(5));
 		assert(120 == Factorial(5));
 
-		factorialHook = new Hook(reinterpret_cast<void*>(Factorial),
-			reinterpret_cast<void*>(MyFactorial),
-			8);
+		factorialHook = new DetourHooking::Hook(reinterpret_cast<void*>(Factorial), reinterpret_cast<void*>(MyFactorial), 8);
 		factorialHook->Enable();
-		assert(factorialHook->error == DETOURHOOKING_SUCCESS);
+		assert(factorialHook->error == DetourHooking::Error::SUCCESS);
 		printf("Hooked Factorial\n");
 
 		printf("5! + 123 = %ld\n", Factorial(5));
 		assert(120 + 123 == Factorial(5));
 	}
 
+	printf("------- Hooking Sum -------\n");
 	{
 		printf("2+5 = %ld\n", Sum(2, 5));
 		assert(7 == Sum(2, 5));
 
-		sumHook = new Hook(reinterpret_cast<void*>(Sum),
-			reinterpret_cast<void*>(MySum),
-			8);
+		sumHook = new DetourHooking::Hook(reinterpret_cast<void*>(Sum), reinterpret_cast<void*>(MySum), 8);
 		sumHook->Enable();
-		assert(sumHook->error == DETOURHOOKING_SUCCESS);
+		assert(sumHook->error == DetourHooking::Error::SUCCESS);
 		printf("Hooked Sum\n");
 
 		printf("2+5 + 123 = %ld\n", Sum(2, 5));
 		assert(7 + 123 == Sum(2, 5));
 	}
 
+	printf("------- Disabling Hooks -------\n");
 	{
 		factorialHook->Disable();
 		sumHook->Disable();
@@ -76,6 +73,13 @@ int main()
 
 		printf("2+5 = %ld\n", Sum(2, 5));
 		assert(7 == Sum(2, 5));
+	}
+
+	printf("------- Finalizing Hooks -------\n");
+	{
+		printf("Deallocating memory by finalizing both hooks\n");
+		delete factorialHook;
+		delete sumHook;
 	}
 
 	return 0;

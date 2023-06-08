@@ -1,32 +1,39 @@
-#ifndef DETOURHOOKING
-#define DETOURHOOKING
+#ifndef DETOURHOOKING_HPP
+#define DETOURHOOKING_HPP
 
-#include <unistd.h>
+#include <cstdint>
 
-#define DETOURHOOKING_MIN_LENGTH 5 // The length of an x86-64 near jmp
+namespace DetourHooking {
+	constexpr std::size_t minLength = 5; // The length of an x86-64 near jmp
 
-// Error definitions
-#define DETOURHOOKING_SUCCESS 0
-#define DETOURHOOKING_INSUFFICIENT_LENGTH 1
-#define DETOURHOOKING_OUT_OF_MEMORY 2
+	enum class Error {
+		SUCCESS = 0,
+		INSUFFICIENT_LENGTH = 1,
+		OUT_OF_MEMORY = 2
+	};
 
-class Hook {
-private:
-	void* original;
-	void* hook;
-	size_t instructionLength;
+	class Hook {
+	private:
+		void* original;
+		void* hook;
+		std::size_t instructionLength;
 
-	bool needsAbsoluteJmp;
-	void* absJmp;
+		bool needsAbsoluteJmp;
+		void* absJmp;
+		struct MemoryPage* memoryPage;
 
-public:
-	void* trampoline;
+		bool enabled;
 
-	int error;
+	public:
+		void* trampoline;
 
-	Hook(void* original, void* hook, size_t instructionLength = DETOURHOOKING_MIN_LENGTH);
-	void Enable();
-	void Disable();
-};
+		Error error;
+
+		Hook(void* original, void* hook, std::size_t instructionLength = minLength);
+		void Enable();
+		void Disable();
+		~Hook();
+	};
+}
 
 #endif

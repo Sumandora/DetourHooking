@@ -14,7 +14,7 @@
 
 using namespace DetourHooking;
 
-Hook::Hook(void* original, void* hook, std::size_t instructionLength)
+Hook::Hook(void* const original, const void* const hook, std::size_t instructionLength)
 {
 	this->original = original;
 	this->hook = hook;
@@ -32,7 +32,7 @@ Hook::Hook(void* original, void* hook, std::size_t instructionLength)
 	}
 	memoryPage->hooks++;
 
-	char* location = reinterpret_cast<char*>(memoryPage->location);
+	char* const location = reinterpret_cast<char*>(memoryPage->location);
 
 	const std::size_t originalOffset = memoryPage->offset;
 	std::size_t& offset = memoryPage->offset;

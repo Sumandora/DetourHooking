@@ -15,7 +15,7 @@ namespace DetourHooking {
 	class Hook {
 	private:
 		void* original;
-		void* hook;
+		const void* hook;
 		std::size_t instructionLength;
 
 		bool needsAbsoluteJmp;
@@ -29,7 +29,7 @@ namespace DetourHooking {
 
 		Error error;
 
-		Hook(void* original, void* hook, std::size_t instructionLength = minLength);
+		Hook(void* const original, const void* const hook, std::size_t instructionLength = minLength);
 		void Enable();
 		void Disable();
 		~Hook();

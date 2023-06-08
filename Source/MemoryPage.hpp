@@ -14,9 +14,9 @@ namespace DetourHooking {
 
 	extern std::vector<MemoryPage> pages;
 
-	void* FindUnusedMemory(const void* preferredLocation);
-	MemoryPage* FindMemory(const void* preferredLocation, const std::size_t instructionLength);
-	void UnmapMemoryPage(MemoryPage* memoryPage);
+	void* FindUnusedMemory(const void* const preferredLocation);
+	MemoryPage* FindMemory(const void* const preferredLocation, const std::size_t instructionLength);
+	void UnmapMemoryPage(MemoryPage* const memoryPage);
 }
 
 #endif

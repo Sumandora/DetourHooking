@@ -10,7 +10,7 @@ namespace DetourHooking {
 
 	std::size_t GetPageSize();
 	void* Align(const void* addr, const std::size_t alignment);
-	std::ptrdiff_t PointerDistance(const void* a, const void* b);
+	std::int64_t PointerDistance(const void* a, const void* b);
 	void Protect(const void* addr, const std::size_t length, const int prot);
 
 	void WriteRelJmp(void* location, const void* target);

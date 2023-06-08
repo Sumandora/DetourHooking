@@ -9,7 +9,7 @@ using namespace DetourHooking;
 
 std::vector<MemoryPage> DetourHooking::pages;
 
-void* DetourHooking::FindUnusedMemory(const void* preferredLocation)
+void* DetourHooking::FindUnusedMemory(const void* const preferredLocation)
 {
 	for (std::size_t offset = 0; offset <= relJmpDistance; offset += GetPageSize())
 		for (int sign = -1; sign <= 2; sign += 2) {
@@ -26,7 +26,7 @@ void* DetourHooking::FindUnusedMemory(const void* preferredLocation)
 	return nullptr;
 }
 
-MemoryPage* DetourHooking::FindMemory(const void* preferredLocation, const std::size_t instructionLength)
+MemoryPage* DetourHooking::FindMemory(const void* const preferredLocation, const std::size_t instructionLength)
 {
 	for (MemoryPage& memoryPage : pages) { // Loop over memory pages and see if we have one that has enough space to cover all instructions
 		const uint64_t distance = PointerDistance(memoryPage.location, preferredLocation);
@@ -51,7 +51,7 @@ MemoryPage* DetourHooking::FindMemory(const void* preferredLocation, const std::
 	return &pages.emplace_back(MemoryPage{ newLocation, 0, 0 });
 }
 
-void DetourHooking::UnmapMemoryPage(MemoryPage* memoryPage)
+void DetourHooking::UnmapMemoryPage(MemoryPage* const memoryPage)
 {
 	munmap(memoryPage->location, GetPageSize());
 	std::erase_if(pages, [&memoryPage](const MemoryPage& otherMemoryPage) {

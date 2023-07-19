@@ -39,7 +39,13 @@ int main()
 		printf("5! = %ld\n", Factorial(5));
 		assert(120 == Factorial(5));
 
-		factorialHook = new DetourHooking::Hook(reinterpret_cast<void*>(Factorial), reinterpret_cast<void*>(MyFactorial), 8);
+		factorialHook = new DetourHooking::Hook(reinterpret_cast<void*>(Factorial), reinterpret_cast<void*>(MyFactorial),
+#ifdef __x86_64
+			8
+#else
+			6
+#endif
+		);
 		factorialHook->Enable();
 		assert(factorialHook->error == DetourHooking::Error::SUCCESS);
 		printf("Hooked Factorial\n");
@@ -53,7 +59,13 @@ int main()
 		printf("2+5 = %ld\n", Sum(2, 5));
 		assert(7 == Sum(2, 5));
 
-		sumHook = new DetourHooking::Hook(reinterpret_cast<void*>(Sum), reinterpret_cast<void*>(MySum), 8);
+		sumHook = new DetourHooking::Hook(reinterpret_cast<void*>(Sum), reinterpret_cast<void*>(MySum),
+#ifdef __x86_64
+			8
+#else
+			6
+#endif
+		);
 		sumHook->Enable();
 		assert(sumHook->error == DetourHooking::Error::SUCCESS);
 		printf("Hooked Sum\n");

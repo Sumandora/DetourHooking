@@ -18,8 +18,10 @@ namespace DetourHooking {
 		const void* hook;
 		std::size_t instructionLength;
 
+#ifdef __x86_64
 		bool needsAbsoluteJmp;
 		void* absJmp;
+#endif
 		struct MemoryPage* memoryPage;
 
 		bool enabled;

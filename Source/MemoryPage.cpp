@@ -30,7 +30,11 @@ MemoryPage* DetourHooking::FindMemory(const void* const preferredLocation, const
 {
 	for (MemoryPage& memoryPage : pages) { // Loop over memory pages and see if we have one that has enough space to cover all instructions
 		const uint64_t distance = PointerDistance(memoryPage.location, preferredLocation);
-		if (GetPageSize() - memoryPage.offset >= instructionLength + relJmpLength + (distance > relJmpDistance ? absJmpLength : 0))
+		if (GetPageSize() - memoryPage.offset >= instructionLength + relJmpLength
+#ifdef __x86_64
+				+ (distance > relJmpDistance ? absJmpLength : 0)
+#endif
+		)
 			if (distance <= relJmpDistance) {
 				// We used this one before, it should be read-only
 				Protect(memoryPage.location, GetPageSize(), PROT_READ | PROT_WRITE | PROT_EXEC);

@@ -37,13 +37,17 @@ Hook::Hook(void* const original, const void* const hook, std::size_t instruction
 	const std::size_t originalOffset = memoryPage->offset;
 	std::size_t& offset = memoryPage->offset;
 
+#ifdef __x86_64
 	needsAbsoluteJmp = PointerDistance(hook, original) > relJmpDistance;
 
 	if (needsAbsoluteJmp) { // Relative jumps can only cover +/- 2 GB, in case that isn't enough we write an absolute jump
 		absJmp = location + offset;
 		WriteAbsJmp(absJmp, hook);
 		offset += absJmpLength;
+	} else {
+		absJmp = nullptr;
 	}
+#endif
 
 	memcpy(location + offset, original, instructionLength); // Stolen bytes
 	offset += instructionLength;
@@ -51,7 +55,11 @@ Hook::Hook(void* const original, const void* const hook, std::size_t instruction
 	WriteRelJmp(location + offset, reinterpret_cast<char*>(original) + relJmpLength); // Back to the original
 	offset += relJmpLength;
 
-	trampoline = location + originalOffset + (needsAbsoluteJmp ? absJmpLength : 0);
+	trampoline = location + originalOffset
+#ifdef __x86_64
+		+ (needsAbsoluteJmp ? absJmpLength : 0)
+#endif
+		;
 
 	// We are done here, make it read-only
 	Protect(memoryPage->location, GetPageSize(), PROT_READ | PROT_EXEC);
@@ -67,11 +75,15 @@ void Hook::Enable()
 
 	Protect(original, instructionLength, PROT_READ | PROT_WRITE | PROT_EXEC);
 
+#ifdef __x86_64
 	if (needsAbsoluteJmp) {
 		WriteRelJmp(original, absJmp);
 	} else {
 		WriteRelJmp(original, hook);
 	}
+#else
+	WriteRelJmp(original, hook);
+#endif
 
 	memset(reinterpret_cast<char*>(original) + relJmpLength, 0x90, instructionLength - relJmpLength);
 

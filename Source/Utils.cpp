@@ -37,9 +37,7 @@ void DetourHooking::WriteRelJmp(void* const location, const void* const target)
 		0xE9, 0x0, 0x0, 0x0, 0x0 // jmp goal
 	};
 	// Calculation for a relative jmp
-	void* const jmpTarget = reinterpret_cast<void* const>(
-		reinterpret_cast<const char* const>(target) - (reinterpret_cast<char* const>(location) + relJmpLength)); // Jumps always start at the rip, which has already
-																												 // increased
+	void* const jmpTarget = reinterpret_cast<void* const>(reinterpret_cast<const char* const>(target) - (reinterpret_cast<char* const>(location) + relJmpLength)); // Jumps always start at the ip, which has already increased
 	std::memcpy(jmpInstruction + 1, &jmpTarget, sizeof(int32_t));
 	std::memcpy(location, jmpInstruction, relJmpLength);
 }
@@ -48,8 +46,7 @@ void DetourHooking::WriteRelJmp(void* const location, const void* const target)
 void DetourHooking::WriteAbsJmp(void* const location, const void* const target)
 {
 	unsigned char absJumpInstructions[] = {
-		0x48, 0xB8, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, // mov rax, goal
+		0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // mov rax, goal
 		0xFF, 0xE0 // jmp rax
 	};
 	std::memcpy(absJumpInstructions + 2, &target, sizeof(void*));

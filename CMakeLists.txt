@@ -14,3 +14,6 @@ target_include_directories(DetourHooking PUBLIC Include)
 
 add_executable(DetourHookingExample Example/Main.cpp)
 target_link_libraries(DetourHookingExample PRIVATE DetourHooking)
+
+enable_testing()
+add_test(NAME DetourHookingExample COMMAND $<TARGET_FILE:DetourHookingExample>)

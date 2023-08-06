@@ -9,5 +9,8 @@ endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-add_executable(DetourHooking Source/Hook.cpp Source/MemoryPage.cpp Source/Utils.cpp Example/Main.cpp)
-target_include_directories(DetourHooking PRIVATE include)
+add_library(DetourHooking SHARED Source/Hook.cpp Source/MemoryPage.cpp Source/Utils.cpp)
+target_include_directories(DetourHooking PUBLIC Include)
+
+add_executable(DetourHookingExample Example/Main.cpp)
+target_link_libraries(DetourHookingExample PRIVATE DetourHooking)

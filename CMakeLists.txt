@@ -9,7 +9,7 @@ endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-add_library(DetourHooking SHARED "${PROJECT_SOURCE_DIR}/Source/Hook.cpp" "${PROJECT_SOURCE_DIR}/Source/MemoryPage.cpp" "${PROJECT_SOURCE_DIR}/Source/Utils.cpp")
+add_library(DetourHooking STATIC "${PROJECT_SOURCE_DIR}/Source/Hook.cpp" "${PROJECT_SOURCE_DIR}/Source/MemoryPage.cpp" "${PROJECT_SOURCE_DIR}/Source/Utils.cpp")
 target_include_directories(DetourHooking PUBLIC "${PROJECT_SOURCE_DIR}/Include")
 
 add_executable(DetourHookingExample "${PROJECT_SOURCE_DIR}/Example/Main.cpp")

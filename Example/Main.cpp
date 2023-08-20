@@ -46,7 +46,7 @@ int main()
 			6
 #endif
 		);
-		factorialHook->Enable();
+		factorialHook->enable();
 		assert(factorialHook->error == DetourHooking::Error::SUCCESS);
 		printf("Hooked Factorial\n");
 
@@ -66,7 +66,7 @@ int main()
 			6
 #endif
 		);
-		sumHook->Enable();
+		sumHook->enable();
 		assert(sumHook->error == DetourHooking::Error::SUCCESS);
 		printf("Hooked Sum\n");
 
@@ -76,8 +76,8 @@ int main()
 
 	printf("------- Disabling Hooks -------\n");
 	{
-		factorialHook->Disable();
-		sumHook->Disable();
+		factorialHook->disable();
+		sumHook->disable();
 		printf("Disabled both hooks\n");
 
 		printf("5! = %ld\n", Factorial(5));

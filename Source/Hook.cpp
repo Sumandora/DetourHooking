@@ -12,6 +12,8 @@
 
 #include <sys/mman.h>
 
+#include "ForceWrite.hpp"
+
 using namespace DetourHooking;
 
 Hook::Hook(void* const original, const void* const hook, std::size_t instructionLength)
@@ -25,7 +27,7 @@ Hook::Hook(void* const original, const void* const hook, std::size_t instruction
 		return;
 	}
 
-	memoryPage = FindMemory(original, instructionLength);
+	memoryPage = findMemory(original, instructionLength);
 	if (!memoryPage) {
 		error = Error::OUT_OF_MEMORY;
 		return;
@@ -38,21 +40,21 @@ Hook::Hook(void* const original, const void* const hook, std::size_t instruction
 	std::size_t& offset = memoryPage->offset;
 
 #ifdef __x86_64
-	needsAbsoluteJmp = PointerDistance(hook, original) > relJmpDistance;
+	needsAbsoluteJmp = pointerDistance(hook, original) > relJmpDistance;
 
 	if (needsAbsoluteJmp) { // Relative jumps can only cover +/- 2 GB, in case that isn't enough we write an absolute jump
 		absJmp = location + offset;
-		WriteAbsJmp(absJmp, hook);
+		writeAbsJmp(absJmp, hook);
 		offset += absJmpLength;
 	} else {
 		absJmp = nullptr;
 	}
 #endif
 
-	memcpy(location + offset, original, instructionLength); // Stolen bytes
+	forceMemCpy(location + offset, original, instructionLength); // Stolen bytes
 	offset += instructionLength;
 
-	WriteRelJmp(location + offset, reinterpret_cast<char*>(original) + relJmpLength); // Back to the original
+	writeRelJmp(location + offset, reinterpret_cast<char*>(original) + relJmpLength); // Back to the original
 	offset += relJmpLength;
 
 	trampoline = location + originalOffset
@@ -61,57 +63,48 @@ Hook::Hook(void* const original, const void* const hook, std::size_t instruction
 #endif
 		;
 
-	// We are done here, make it read-only
-	Protect(memoryPage->location, GetPageSize(), PROT_READ | PROT_EXEC);
-
 	error = Error::SUCCESS;
 	enabled = false;
 }
 
-void Hook::Enable()
+void Hook::enable()
 {
 	if (error != Error::SUCCESS || enabled)
 		return;
 
-	Protect(original, instructionLength, PROT_READ | PROT_WRITE | PROT_EXEC);
-
 #ifdef __x86_64
 	if (needsAbsoluteJmp) {
-		WriteRelJmp(original, absJmp);
+		writeRelJmp(original, absJmp);
 	} else {
-		WriteRelJmp(original, hook);
+		writeRelJmp(original, hook);
 	}
 #else
-	WriteRelJmp(original, hook);
+	writeRelJmp(original, hook);
 #endif
 
-	memset(reinterpret_cast<char*>(original) + relJmpLength, 0x90, instructionLength - relJmpLength);
+	forceMemSet(reinterpret_cast<char*>(original) + relJmpLength, 0x90, instructionLength - relJmpLength);
 
-	Protect(original, instructionLength, PROT_READ | PROT_EXEC);
 	enabled = true;
 }
 
-void Hook::Disable()
+void Hook::disable()
 {
 	if (error != Error::SUCCESS || !enabled)
 		return;
 
-	Protect(original, instructionLength, PROT_READ | PROT_WRITE | PROT_EXEC);
+	forceMemCpy(original, trampoline, instructionLength);
 
-	memcpy(original, trampoline, instructionLength);
-
-	Protect(original, instructionLength, PROT_READ | PROT_EXEC);
 	enabled = false;
 }
 
 Hook::~Hook()
 {
 	if (enabled)
-		Disable();
+		disable();
 
 	memoryPage->hooks--;
 
 	if (memoryPage->hooks <= 0) {
-		UnmapMemoryPage(memoryPage);
+		unmapMemoryPage(memoryPage);
 	}
 }

@@ -17,15 +17,17 @@ FetchContent_Declare(ForceWrite
 	GIT_REPOSITORY https://github.com/Sumandora/ForceWrite
 	GIT_PROGRESS TRUE
 	GIT_SHALLOW TRUE
-	GIT_TAG v1.0.0)
+	GIT_TAG b9a94a5)
 FetchContent_MakeAvailable(ForceWrite)
 target_link_libraries(DetourHooking ForceWrite)
 
-add_executable(DetourHookingExample "${PROJECT_SOURCE_DIR}/Example/Main.cpp")
-target_link_libraries(DetourHookingExample PRIVATE DetourHooking)
-if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8) # This is not required in a real world application
-	target_compile_options(DetourHookingExample PRIVATE "-fno-pie")
-endif()
+if(PROJECT_IS_TOP_LEVEL)
+	add_executable(DetourHookingExample "${PROJECT_SOURCE_DIR}/Example/Main.cpp")
+	target_link_libraries(DetourHookingExample PRIVATE DetourHooking)
+	if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8) # This is not required in a real world application
+		target_compile_options(DetourHookingExample PRIVATE "-fno-pie")
+	endif()
 
-enable_testing()
-add_test(NAME DetourHookingExample COMMAND $<TARGET_FILE:DetourHookingExample>)
+	enable_testing()
+	add_test(NAME DetourHookingExample COMMAND $<TARGET_FILE:DetourHookingExample>)
+endif()

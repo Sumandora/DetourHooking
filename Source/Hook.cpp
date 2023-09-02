@@ -21,7 +21,6 @@ Hook::Hook(void* const original, const void* const hook, std::size_t instruction
 		error = Error::OUT_OF_MEMORY;
 		return;
 	}
-	memoryPage->hooks++;
 
 	char* const location = reinterpret_cast<char*>(memoryPage->location);
 
@@ -91,9 +90,5 @@ Hook::~Hook()
 	if (enabled)
 		disable();
 
-	memoryPage->hooks--;
-
-	if (memoryPage->hooks <= 0) {
-		unmapMemoryPage(memoryPage);
-	}
+	unmapMemoryPage(memoryPage);
 }

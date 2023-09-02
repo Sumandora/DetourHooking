@@ -10,9 +10,9 @@ namespace DetourHooking {
 	constexpr std::size_t absJmpLength = 12; // The length of an x86-64 absolute jmp
 #endif
 
-	std::size_t getPageSize();
+	[[nodiscard]] std::size_t getPageSize();
 	void* align(const void* addr, std::size_t alignment);
-	std::size_t pointerDistance(const void* a, const void* b);
+	[[nodiscard]] std::size_t pointerDistance(const void* a, const void* b);
 
 	void writeRelJmp(void* location, const void* target);
 #ifdef __x86_64

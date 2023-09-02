@@ -1,5 +1,6 @@
 #include <cassert>
 #include <iostream>
+#include <vector>
 
 #include "DetourHooking.hpp"
 
@@ -24,12 +25,28 @@ long Sum(long a, long b)
 
 long MyFactorial(long a)
 {
-	return reinterpret_cast<FactorialFunc>(factorialHook->trampoline)(a) + 123;
+	return reinterpret_cast<FactorialFunc>(factorialHook->getTrampoline())(a) + 123;
 }
 
 long MySum(long a, long b)
 {
-	return reinterpret_cast<SumFunc>(sumHook->trampoline)(a, b) + 123;
+	return reinterpret_cast<SumFunc>(sumHook->getTrampoline())(a, b) + 123;
+}
+
+namespace DetourHooking {
+	struct MemoryPage {
+		void* location;
+		std::size_t offset; // How much has been written there?
+		MemoryPage(void* location, std::size_t offset)
+			: location(location)
+			, offset(offset)
+		{
+			printf("Constructed MemoryPage\n");
+		}
+		~MemoryPage() { printf("Deconstructed MemoryPage\n"); }
+	};
+
+	extern std::vector<std::shared_ptr<MemoryPage>> pages;
 }
 
 int main()
@@ -47,7 +64,7 @@ int main()
 #endif
 		);
 		factorialHook->enable();
-		assert(factorialHook->error == DetourHooking::Error::SUCCESS);
+		assert(factorialHook->getError() == DetourHooking::Error::SUCCESS);
 		printf("Hooked Factorial\n");
 
 		printf("5! + 123 = %ld\n", Factorial(5));
@@ -67,7 +84,7 @@ int main()
 #endif
 		);
 		sumHook->enable();
-		assert(sumHook->error == DetourHooking::Error::SUCCESS);
+		assert(sumHook->getError() == DetourHooking::Error::SUCCESS);
 		printf("Hooked Sum\n");
 
 		printf("2+5 + 123 = %ld\n", Sum(2, 5));

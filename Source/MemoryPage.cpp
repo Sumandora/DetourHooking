@@ -6,7 +6,12 @@
 
 using namespace DetourHooking;
 
-std::vector<MemoryPage> DetourHooking::pages;
+std::vector<std::shared_ptr<MemoryPage>> DetourHooking::pages;
+
+MemoryPage::~MemoryPage()
+{
+	munmap(location, getPageSize());
+}
 
 void* DetourHooking::findUnusedMemory(const void* const preferredLocation)
 {
@@ -25,17 +30,17 @@ void* DetourHooking::findUnusedMemory(const void* const preferredLocation)
 	return nullptr;
 }
 
-MemoryPage* DetourHooking::findMemory(const void* const preferredLocation, const std::size_t instructionLength)
+std::shared_ptr<MemoryPage> DetourHooking::findMemory(const void* const preferredLocation, const std::size_t instructionLength)
 {
-	for (MemoryPage& memoryPage : pages) { // Loop over memory pages and see if we have one that has enough space to cover all instructions
-		const uint64_t distance = pointerDistance(memoryPage.location, preferredLocation);
-		if (getPageSize() - memoryPage.offset >= instructionLength + relJmpLength
+	for (const std::shared_ptr<MemoryPage>& memoryPage : pages) { // Loop over memory pages and see if we have one that has enough space to cover all instructions
+		const uint64_t distance = pointerDistance(memoryPage->location, preferredLocation);
+		if (getPageSize() - memoryPage->offset >= instructionLength + relJmpLength
 #ifdef __x86_64
 				+ (distance > relJmpDistance ? absJmpLength : 0)
 #endif
 		)
 			if (distance <= relJmpDistance)
-				return &memoryPage;
+				return memoryPage;
 	}
 
 	void* newLocation = findUnusedMemory(preferredLocation);
@@ -48,13 +53,16 @@ MemoryPage* DetourHooking::findMemory(const void* const preferredLocation, const
 		return nullptr;
 	}
 
-	return &pages.emplace_back(MemoryPage{ newLocation, 0, 0 });
+	return pages.emplace_back(std::make_shared<MemoryPage>(newLocation));
 }
 
-void DetourHooking::unmapMemoryPage(MemoryPage* const memoryPage)
+void DetourHooking::unmapMemoryPage(const std::shared_ptr<MemoryPage>& memoryPage)
 {
-	munmap(memoryPage->location, getPageSize());
-	std::erase_if(pages, [&memoryPage](const MemoryPage& otherMemoryPage) {
-		return memoryPage == &otherMemoryPage;
+	if(!memoryPage.unique())
+		return; // There are other references than the vector, we shouldn't release this one yet
+	std::erase_if(pages, [&memoryPage](const std::shared_ptr<MemoryPage>& otherMemoryPage) {
+		// Are the underlying pointers the same?
+		return memoryPage.get() == otherMemoryPage.get();
 	});
+	// The vector should hold the last valid reference, by destroying it we invoke the destructor, which unmaps the memory
 }

@@ -2,6 +2,7 @@
 #define DETOURHOOKING_HPP
 
 #include <cstdint>
+#include <memory>
 
 namespace DetourHooking {
 	constexpr std::size_t minLength = 5; // The length of an x86-64 near jmp
@@ -22,19 +23,23 @@ namespace DetourHooking {
 		bool needsAbsoluteJmp;
 		void* absJmp;
 #endif
-		struct MemoryPage* memoryPage;
+		std::shared_ptr<struct MemoryPage> memoryPage;
 
 		bool enabled;
 
-	public:
 		void* trampoline;
-
 		Error error;
+
+	public:
 
 		Hook(void* original, const void* hook, std::size_t instructionLength = minLength);
 		void enable();
 		void disable();
 		~Hook();
+
+		[[nodiscard]] inline bool isEnabled() const { return enabled; }
+		[[nodiscard]] inline void* getTrampoline() const { return trampoline; }
+		[[nodiscard]] inline Error getError() const { return error; }
 	};
 }
 

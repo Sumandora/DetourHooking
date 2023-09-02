@@ -16,7 +16,6 @@ include(FetchContent)
 FetchContent_Declare(ForceWrite
 	GIT_REPOSITORY https://github.com/Sumandora/ForceWrite
 	GIT_PROGRESS TRUE
-	GIT_SHALLOW TRUE
 	GIT_TAG b9a94a5)
 FetchContent_MakeAvailable(ForceWrite)
 target_link_libraries(DetourHooking ForceWrite)

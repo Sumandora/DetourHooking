@@ -3,17 +3,6 @@
 #include "MemoryPage.hpp"
 #include "Utils.hpp"
 
-#include <cmath>
-#include <cstdint>
-#include <cstring>
-#include <iostream>
-#include <unistd.h>
-#include <vector>
-
-#include <sys/mman.h>
-
-#include "ForceWrite.hpp"
-
 using namespace DetourHooking;
 
 Hook::Hook(void* const original, const void* const hook, std::size_t instructionLength)

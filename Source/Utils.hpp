@@ -1,5 +1,5 @@
-#ifndef _DETOURHOOKING_UTILS_HPP
-#define _DETOURHOOKING_UTILS_HPP
+#ifndef DETOURHOOKING_UTILS_HPP
+#define DETOURHOOKING_UTILS_HPP
 
 #include <cstdint>
 
@@ -11,7 +11,7 @@ namespace DetourHooking {
 #endif
 
 	std::size_t getPageSize();
-	void* align(const void* addr, const std::size_t alignment);
+	void* align(const void* addr, std::size_t alignment);
 	std::size_t pointerDistance(const void* a, const void* b);
 
 	void writeRelJmp(void* location, const void* target);

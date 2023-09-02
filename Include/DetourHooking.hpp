@@ -31,7 +31,7 @@ namespace DetourHooking {
 
 		Error error;
 
-		Hook(void* const original, const void* const hook, std::size_t instructionLength = minLength);
+		Hook(void* original, const void* hook, std::size_t instructionLength = minLength);
 		void enable();
 		void disable();
 		~Hook();

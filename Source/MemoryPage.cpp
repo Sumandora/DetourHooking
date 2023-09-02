@@ -2,7 +2,6 @@
 
 #include "Utils.hpp"
 
-#include <algorithm>
 #include <sys/mman.h>
 
 using namespace DetourHooking;

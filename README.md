@@ -6,17 +6,17 @@ To hook a function, create a `Hook` object and pass the address of the original 
 ```c++
 Hook* hook = new Hook(OriginalFunction, MyFunction, StolenBytesSize);
 ```
-After creating the `Hook` object, enable it by calling the `Enable()` method.
+After creating the `Hook` object, enable it by calling the `enable()` method.
 ```c++
-hook->Enable();
+hook->enable();
 ```
 If the hook was successfully enabled, the `error` member of the `Hook` object will be set to `DETOURHOOKING_SUCCESS`. You can check this by using an assertion:
 ```c++
 assert(hook->error == DETOURHOOKING_SUCCESS);
 ```
-In case you want to disable the `Hook` you can use the `Disable()` method
+In case you want to disable the `Hook` you can use the `disable()` method
 ```c++
-hook->Disable();
+hook->disable();
 ```
 
 To minimize memory usage, the library reuses memory pages whenever possible. When you create a new hook, it will try to find a suitable location in memory to store the stolen bytes and the jump instruction. If no suitable location is found, it will allocate a new memory page.
@@ -25,6 +25,8 @@ To minimize memory usage, the library reuses memory pages whenever possible. Whe
 Here's a simple example that hooks the `puts` function and adds a prefix to the output:
 ```c++
 #include "DetourHooking.hpp"
+
+using namespace DetourHooking;
 
 #include <cstdio>
 #include <cstdarg>
@@ -38,7 +40,7 @@ int MyPuts(const char *__s)
 int main()
 {
 	Hook* hook = new Hook((void*)puts, (void*) MyPuts, /* The stolen bytes size will vary for each system */);
-	hook->Enable();
+	hook->enable();
 	assert(hook->error == DETOURHOOKING_SUCCESS);
 
 	puts("Detour Hooking is awesome\n");

@@ -33,22 +33,6 @@ long MySum(long a, long b)
 	return reinterpret_cast<SumFunc>(sumHook->getTrampoline())(a, b) + 123;
 }
 
-namespace DetourHooking {
-	struct MemoryPage {
-		void* location;
-		std::size_t offset; // How much has been written there?
-		MemoryPage(void* location, std::size_t offset)
-			: location(location)
-			, offset(offset)
-		{
-			printf("Constructed MemoryPage\n");
-		}
-		~MemoryPage() { printf("Deconstructed MemoryPage\n"); }
-	};
-
-	extern std::vector<std::shared_ptr<MemoryPage>> pages;
-}
-
 int main()
 {
 	printf("------- Hooking Factorial -------\n");

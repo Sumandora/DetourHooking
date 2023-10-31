@@ -59,7 +59,7 @@ std::shared_ptr<MemoryPage> DetourHooking::findMemory(const void* const preferre
 void DetourHooking::unmapMemoryPage(const std::shared_ptr<MemoryPage>& memoryPage)
 {
 	if(!memoryPage.unique())
-		return; // There are other references than the vector, we shouldn't release this one yet
+		return; // There are other references than the 'pages'-vector, we shouldn't release this one yet
 	std::erase_if(pages, [&memoryPage](const std::shared_ptr<MemoryPage>& otherMemoryPage) {
 		// Are the underlying pointers the same?
 		return memoryPage.get() == otherMemoryPage.get();

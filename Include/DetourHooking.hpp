@@ -9,8 +9,8 @@ namespace DetourHooking {
 
 	enum class Error {
 		SUCCESS = 0,
-		INSUFFICIENT_LENGTH = 1,
-		OUT_OF_MEMORY = 2
+		INSUFFICIENT_LENGTH = 1, // The `instructionLength` was too small
+		OUT_OF_MEMORY = 2 // Wasn't able to allocate memory
 	};
 
 	class Hook {
@@ -31,8 +31,12 @@ namespace DetourHooking {
 		Error error;
 
 	public:
-
-		Hook(void* original, const void* hook, std::size_t instructionLength = minLength);
+		template <typename T, typename R>
+		explicit Hook(T original, const R hook, std::size_t instructionLength = minLength) requires std::conjunction_v<std::negation<std::is_same<T, void*>>, std::negation<std::is_same<R, const void*>>>
+			: Hook(reinterpret_cast<void*>(original), reinterpret_cast<const void*>(hook), instructionLength)
+		{
+		}
+		explicit Hook(void* original, const void* hook, std::size_t instructionLength = minLength);
 		void enable();
 		void disable();
 		~Hook();
@@ -40,6 +44,21 @@ namespace DetourHooking {
 		[[nodiscard]] inline bool isEnabled() const { return enabled; }
 		[[nodiscard]] inline void* getTrampoline() const { return trampoline; }
 		[[nodiscard]] inline Error getError() const { return error; }
+	};
+
+	class RefCountedHook : public Hook {
+		std::int64_t referenceCounter = 0; // This can also be negative
+
+		using Hook::enable;
+		using Hook::disable;
+
+	public:
+		using Hook::Hook;
+
+		void acquire();
+		void release();
+
+		[[nodiscard]] std::int64_t getReferenceCounter() const { return referenceCounter; }
 	};
 }
 

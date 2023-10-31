@@ -57,7 +57,12 @@ Hook::Hook(void* const original, const void* const hook, std::size_t instruction
 
 void Hook::enable()
 {
-	if (error != Error::SUCCESS || enabled)
+	if (error != Error::SUCCESS) {
+		asm("int3"); // We should alert the users debugger in this case
+		return;
+	}
+
+	if(enabled) // No work to do here
 		return;
 
 #ifdef __x86_64
@@ -77,7 +82,7 @@ void Hook::enable()
 
 void Hook::disable()
 {
-	if (error != Error::SUCCESS || !enabled)
+	if (!enabled) // No work to do here
 		return;
 
 	forceMemCpy(original, trampoline, instructionLength);

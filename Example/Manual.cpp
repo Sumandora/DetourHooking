@@ -40,7 +40,7 @@ int main()
 		printf("2+5 = %ld\n", sum(2, 5));
 		assert(7 == sum(2, 5));
 
-		sumHook = new DetourHooking::Hook(reinterpret_cast<void*>(sum), reinterpret_cast<void*>(mySum), INSTRUCTION_LENGTH);
+		sumHook = new DetourHooking::Hook(sum, mySum, INSTRUCTION_LENGTH);
 		sumHook->enable();
 		assert(sumHook->getError() == DetourHooking::Error::SUCCESS);
 		printf("Hooked Sum\n");

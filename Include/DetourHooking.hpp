@@ -9,8 +9,8 @@ namespace DetourHooking {
 
 	enum class Error {
 		SUCCESS = 0,
-		INSUFFICIENT_LENGTH = 1,
-		OUT_OF_MEMORY = 2
+		INSUFFICIENT_LENGTH = 1, // The `instructionLength` was too small
+		OUT_OF_MEMORY = 2 // Wasn't able to allocate memory
 	};
 
 	class Hook {

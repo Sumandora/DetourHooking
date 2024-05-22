@@ -2,6 +2,8 @@
 #include <iostream>
 #include <vector>
 
+#include "MemoryManager/LocalMemoryManager.hpp"
+#include "ExecutableMalloc/MemoryManagerAllocator.hpp"
 #include "DetourHooking.hpp"
 
 typedef long (*FactorialFunc)(long);
@@ -35,12 +37,14 @@ long MySum(long a, long b)
 
 int main()
 {
+	MemoryManager::LocalMemoryManager<MemoryManager::RWMode::WRITE> memoryManager;
+	ExecutableMalloc::MemoryManagerMemoryBlockAllocator allocator{ memoryManager };
 	printf("------- Hooking Factorial -------\n");
 	{
 		printf("5! = %ld\n", Factorial(5));
 		assert(120 == Factorial(5));
 
-		factorialHook = new DetourHooking::Hook(reinterpret_cast<void*>(Factorial), reinterpret_cast<void*>(MyFactorial),
+		factorialHook = new DetourHooking::Hook(allocator, reinterpret_cast<void*>(Factorial), reinterpret_cast<void*>(MyFactorial),
 #ifdef __x86_64
 			8
 #else
@@ -48,7 +52,6 @@ int main()
 #endif
 		);
 		factorialHook->enable();
-		assert(factorialHook->getError() == DetourHooking::Error::SUCCESS);
 		printf("Hooked Factorial\n");
 
 		printf("5! + 123 = %ld\n", Factorial(5));
@@ -60,7 +63,7 @@ int main()
 		printf("2+5 = %ld\n", Sum(2, 5));
 		assert(7 == Sum(2, 5));
 
-		sumHook = new DetourHooking::Hook(reinterpret_cast<void*>(Sum), reinterpret_cast<void*>(MySum),
+		sumHook = new DetourHooking::Hook(allocator, reinterpret_cast<void*>(Sum), reinterpret_cast<void*>(MySum),
 #ifdef __x86_64
 			8
 #else
@@ -68,7 +71,6 @@ int main()
 #endif
 		);
 		sumHook->enable();
-		assert(sumHook->getError() == DetourHooking::Error::SUCCESS);
 		printf("Hooked Sum\n");
 
 		printf("2+5 + 123 = %ld\n", Sum(2, 5));

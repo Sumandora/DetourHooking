@@ -1,94 +1,135 @@
 #include "DetourHooking.hpp"
+#include <cstring>
 
-#include "MemoryPage.hpp"
 #include "Utils.hpp"
 
 using namespace DetourHooking;
 
-Hook::Hook(void* const original, const void* const hook, std::size_t instructionLength)
+Exception::Exception(Error error)
+	: error(error)
 {
-	this->original = original;
-	this->hook = hook;
-	this->instructionLength = instructionLength;
+}
 
+Hook::Hook(
+	ExecutableMalloc::MemoryManagerMemoryBlockAllocator& allocator,
+	void* const original,
+	const void* const hook,
+	std::size_t instructionLength)
+	: original(reinterpret_cast<std::uintptr_t>(original))
+	, hook(reinterpret_cast<std::uintptr_t>(hook))
+	, instructionLength(instructionLength)
+	, memoryManager(allocator.getMemoryManager())
+{
 	if (instructionLength < minLength) {
-		error = Error::INSUFFICIENT_LENGTH; // We won't be able to fit a near jmp
-		return;
+		throw Exception(Error::INSUFFICIENT_LENGTH); // We won't be able to fit a near jmp
 	}
-
-	memoryPage = findMemory(original, instructionLength);
-	if (!memoryPage) {
-		error = Error::OUT_OF_MEMORY;
-		return;
-	}
-
-	char* const location = reinterpret_cast<char*>(memoryPage->location);
-
-	const std::size_t originalOffset = memoryPage->offset;
-	std::size_t& offset = memoryPage->offset;
 
 #ifdef __x86_64
-	needsAbsoluteJmp = pointerDistance(hook, original) > relJmpDistance;
+	needsTrampolineJump = pointerDistance(reinterpret_cast<std::uintptr_t>(hook), reinterpret_cast<std::uintptr_t>(original)) > relJmpDistance;
+#endif
 
-	if (needsAbsoluteJmp) { // Relative jumps can only cover +/- 2 GB, in case that isn't enough we write an absolute jump
-		absJmp = location + offset;
-		writeAbsJmp(absJmp, hook);
-		offset += absJmpLength;
-	} else {
-		absJmp = nullptr;
+	unsigned char bytes[
+#ifdef __x86_64
+		(needsTrampolineJump ? absJmpLength : 0) +
+#endif
+		instructionLength + relJmpLength];
+	std::size_t offset = 0;
+	std::size_t bytesLength = sizeof(bytes) / sizeof(*bytes);
+
+	memoryPage = allocator.getRegion(reinterpret_cast<std::uintptr_t>(original), bytesLength, memoryManager.requiresPermissionsForWriting());
+#ifdef __x86_64
+	if (needsTrampolineJump) { // Relative jumps can only cover +/- 2 GB, in case that isn't enough we write an absolute jump
+		// Maybe the memory page is just close enough to the hook that we can save some space by making a relative jump
+		bool needsAbsTrampolineJump = pointerDistance(this->hook, memoryPage->getFrom()) > relJmpDistance;
+		if (needsAbsTrampolineJump) {
+			writeAbsJmp(this->hook, bytes);
+			offset += absJmpLength;
+		} else {
+			writeRelJmp(memoryPage->getFrom(), this->hook, bytes);
+			offset += relJmpLength;
+			memoryPage->resize(bytesLength - (absJmpLength - relJmpLength)); // We can now save some bytes because we can make a relative jump
+		}
 	}
 #endif
 
-	forceMemCpy(location + offset, original, instructionLength); // Stolen bytes
+	trampoline = memoryPage->getFrom() + offset;
+
+	std::memcpy(bytes + offset, original, instructionLength); // Stolen bytes
 	offset += instructionLength;
 
-	writeRelJmp(location + offset, reinterpret_cast<char*>(original) + relJmpLength); // Back to the original
-	offset += relJmpLength;
+	writeRelJmp(memoryPage->getFrom() + offset, this->original + instructionLength, bytes + offset); // Back to the original
 
-	trampoline = location + originalOffset
-#ifdef __x86_64
-		+ (needsAbsoluteJmp ? absJmpLength : 0)
-#endif
-		;
+	memoryManager.write(memoryPage->getFrom(), bytes, bytesLength);
 
-	error = Error::SUCCESS;
+	if(memoryPage->isWritable())
+		memoryPage->setWritable(false);
 	enabled = false;
 }
 
-void Hook::enable()
+void Hook::enable() noexcept
 {
-	if (error != Error::SUCCESS || enabled)
+	if (enabled)
 		return;
 
+	unsigned char bytes[relJmpLength];
 #ifdef __x86_64
-	if (needsAbsoluteJmp) {
-		writeRelJmp(original, absJmp);
-	} else {
-		writeRelJmp(original, hook);
-	}
-#else
-	writeRelJmp(original, hook);
+	if (needsTrampolineJump)
+		writeRelJmp(original, memoryPage->getFrom(), bytes);
+	else
 #endif
+		writeRelJmp(original, hook, bytes);
 
-	forceMemSet(reinterpret_cast<char*>(original) + relJmpLength, 0x90, instructionLength - relJmpLength);
+	if (memoryManager.requiresPermissionsForWriting()) {
+		memoryManager.protect(align(original, memoryManager.getPageGranularity()), memoryManager.getPageGranularity(), { true, true, true });
+		memoryManager.write(original, bytes, relJmpLength);
+		memoryManager.protect(align(original, memoryManager.getPageGranularity()), memoryManager.getPageGranularity(), { true, false, true });
+	} else
+		memoryManager.write(original, bytes, relJmpLength);
 
 	enabled = true;
 }
 
-void Hook::disable()
+void Hook::disable() noexcept
 {
-	if (error != Error::SUCCESS || !enabled)
+	if (!enabled)
 		return;
 
-	forceMemCpy(original, trampoline, instructionLength);
+	mprotect(reinterpret_cast<void*>(align(original, getpagesize())), getpagesize(), PROT_READ | PROT_WRITE | PROT_EXEC);
+	memcpy(reinterpret_cast<void*>(original), reinterpret_cast<const void*>(trampoline), instructionLength);
 
 	enabled = false;
 }
 
-Hook::~Hook()
+Hook::~Hook() noexcept
 {
 	if (enabled)
 		disable();
-
-	unmapMemoryPage(memoryPage);
 }
+
+bool Hook::writeRelJmp(std::uintptr_t location, std::uintptr_t target, unsigned char* bytes)
+{
+	// Jumps always start at the ip, which has already increased.
+	// The theoretical overflow here is a non-issue as creating a hook at the end of the memory range is never going to happen.
+	location += relJmpLength;
+	// Calculation for a relative jmp
+	std::size_t distance = pointerDistance(target, location);
+	if (distance > relJmpDistance)
+		return false;
+	auto jmpTarget = static_cast<std::int32_t>(distance); // This cast is exactly why we need absolute jumps sometimes
+	if (location > target) // Are we going backwards?
+		jmpTarget *= -1;
+	bytes[0] = '\xE9';
+	std::memcpy(bytes + 1, &jmpTarget, sizeof(std::int32_t));
+	return true;
+}
+
+#ifdef __x86_64
+void Hook::writeAbsJmp(std::uintptr_t target, unsigned char* bytes)
+{
+	bytes[0] = '\x48';
+	bytes[1] = '\xB8';
+	std::memcpy(bytes + 2, &target, sizeof(void*));
+	bytes[10] = '\xFF';
+	bytes[11] = '\xE0';
+}
+#endif

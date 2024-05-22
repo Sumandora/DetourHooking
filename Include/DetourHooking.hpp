@@ -1,45 +1,60 @@
 #ifndef DETOURHOOKING_HPP
 #define DETOURHOOKING_HPP
 
+#include "ExecutableMalloc/MemoryManagerAllocator.hpp"
+
 #include <cstdint>
+#include <cstring>
 #include <memory>
+#include <sys/mman.h>
 
 namespace DetourHooking {
 	constexpr std::size_t minLength = 5; // The length of an x86-64 near jmp
 
 	enum class Error {
-		SUCCESS = 0,
-		INSUFFICIENT_LENGTH = 1, // The `instructionLength` was too small
-		OUT_OF_MEMORY = 2 // Wasn't able to allocate memory
+		INSUFFICIENT_LENGTH = 0, // The `instructionLength` was too small
+	};
+
+	class Exception : std::exception {
+		Error error;
+	public:
+		explicit Exception(Error error);
+		[[nodiscard]] Error getError() const noexcept { return error; }
 	};
 
 	class Hook {
 	private:
-		void* original;
-		const void* hook;
+		std::uintptr_t original;
+		std::uintptr_t hook;
 		std::size_t instructionLength;
 
 #ifdef __x86_64
-		bool needsAbsoluteJmp;
-		void* absJmp;
+		bool needsTrampolineJump;
 #endif
-		std::shared_ptr<struct MemoryPage> memoryPage;
+		std::unique_ptr<ExecutableMalloc::MemoryRegion> memoryPage;
+		const MemoryManager::MemoryManager& memoryManager;
 
 		bool enabled;
 
-		void* trampoline;
-		Error error;
+		std::uintptr_t trampoline;
 
+	protected:
+		static bool writeRelJmp(std::uintptr_t location, std::uintptr_t target, unsigned char* bytes);
+#ifdef __x86_64
+		static void writeAbsJmp(std::uintptr_t target, unsigned char* bytes);
+#endif
 	public:
+		Hook(
+			ExecutableMalloc::MemoryManagerMemoryBlockAllocator& allocator,
+			void* original,
+			const void* hook,
+			std::size_t instructionLength); // May throw exceptions
+		void enable() noexcept;
+		void disable() noexcept;
+		~Hook() noexcept;
 
-		Hook(void* original, const void* hook, std::size_t instructionLength = minLength);
-		void enable();
-		void disable();
-		~Hook();
-
-		[[nodiscard]] inline bool isEnabled() const { return enabled; }
-		[[nodiscard]] inline void* getTrampoline() const { return trampoline; }
-		[[nodiscard]] inline Error getError() const { return error; }
+		[[nodiscard]] inline bool isEnabled() const noexcept { return enabled; }
+		[[nodiscard]] inline std::uintptr_t getTrampoline() const noexcept { return trampoline; }
 	};
 }
 

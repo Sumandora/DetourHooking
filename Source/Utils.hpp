@@ -2,24 +2,18 @@
 #define DETOURHOOKING_UTILS_HPP
 
 #include <cstdint>
+#include <limits>
 
 namespace DetourHooking {
-	constexpr std::size_t relJmpDistance = INT32_MAX;
+	constexpr std::size_t relJmpDistance = std::numeric_limits<std::int32_t>::max();
 	constexpr std::size_t relJmpLength = 5; // The length of an x86(-64) relative jmp
 #ifdef __x86_64
 	constexpr std::size_t absJmpLength = 12; // The length of an x86-64 absolute jmp
 #endif
 
-	[[nodiscard]] std::size_t getPageSize();
-	void* align(const void* addr, std::size_t alignment);
-	[[nodiscard]] std::size_t pointerDistance(const void* a, const void* b);
+	[[nodiscard]] std::uintptr_t align(std::uintptr_t addr, std::size_t alignment);
+	[[nodiscard]] std::size_t pointerDistance(std::uintptr_t a, std::uintptr_t b);
 
-	void writeRelJmp(void* location, const void* target);
-#ifdef __x86_64
-	void writeAbsJmp(void* location, const void* target);
-#endif
-	void forceMemCpy(void* dest, const void* src, std::size_t n);
-	void forceMemSet(void* s, int c, std::size_t n);
 }
 
 #endif

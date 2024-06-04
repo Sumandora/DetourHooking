@@ -2,9 +2,9 @@
 #include <iostream>
 #include <vector>
 
-#include "MemoryManager/LocalMemoryManager.hpp"
-#include "ExecutableMalloc/MemoryManagerAllocator.hpp"
 #include "DetourHooking.hpp"
+#include "ExecutableMalloc/MemoryManagerAllocator.hpp"
+#include "MemoryManager/LocalMemoryManager.hpp"
 
 typedef long (*FactorialFunc)(long);
 typedef long (*SumFunc)(long, long);

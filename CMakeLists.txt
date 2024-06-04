@@ -13,7 +13,7 @@ include(FetchContent)
 FetchContent_Declare(ExecutableMalloc
         GIT_REPOSITORY https://github.com/Sumandora/ExecutableMalloc
         GIT_PROGRESS TRUE
-        GIT_TAG 1.0)
+        GIT_TAG 1.1)
 FetchContent_MakeAvailable(ExecutableMalloc)
 add_subdirectory("${ExecutableMalloc_SOURCE_DIR}/Extensions/MemoryManagerAllocator")
 target_link_libraries(DetourHooking INTERFACE ExecutableMallocMemoryManagerAllocator)

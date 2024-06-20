@@ -15,7 +15,7 @@ FetchContent_Declare(ExecutableMalloc
         GIT_PROGRESS TRUE
         GIT_TAG 1.1)
 FetchContent_MakeAvailable(ExecutableMalloc)
-add_subdirectory("${ExecutableMalloc_SOURCE_DIR}/Extensions/MemoryManagerAllocator")
+add_subdirectory("${ExecutableMalloc_SOURCE_DIR}/Extensions/MemoryManagerAllocator" "MemoryManagerAllocator")
 target_link_libraries(DetourHooking INTERFACE ExecutableMallocMemoryManagerAllocator)
 
 if (PROJECT_IS_TOP_LEVEL)

@@ -18,7 +18,7 @@ if (NOT TARGET ExecutableMalloc)
     FetchContent_MakeAvailable(ExecutableMalloc)
 endif ()
 if (NOT TARGET ExecutableMallocMemoryManager)
-    add_subdirectory("${ExecutableMalloc_SOURCE_DIR}/Modules/MemoryManagerAllocator")
+    add_subdirectory("${ExecutableMalloc_SOURCE_DIR}/Modules/MemoryManagerAllocator" "MemoryManagerAllocator")
 endif ()
 target_link_libraries(DetourHooking INTERFACE ExecutableMallocMemoryManager)
 

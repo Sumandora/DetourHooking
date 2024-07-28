@@ -12,12 +12,16 @@ namespace DetourHooking {
 	constexpr std::size_t minLength = 5; // The length of an x86-64 near jmp
 	constexpr std::size_t relJmpDistance = std::numeric_limits<std::int32_t>::max();
 	constexpr std::size_t relJmpLength = 5; // The length of an x86(-64) relative jmp
-#ifdef __x86_64
 	constexpr std::size_t absJmpLength = 12; // The length of an x86-64 absolute jmp
-#endif
 
 	namespace detail {
-		constexpr std::uintptr_t align(std::uintptr_t addr, const std::size_t alignment)
+#ifdef __x86_64
+		constexpr bool Is64Bit = true;
+#else
+		constexpr bool Is64Bit = false;
+#endif
+
+		constexpr std::uintptr_t align(std::uintptr_t addr, std::size_t alignment)
 		{
 			return addr - addr % alignment;
 		}
@@ -26,57 +30,35 @@ namespace DetourHooking {
 		{
 			return std::max(a, b) - std::min(a, b);
 		}
-	}
 
-	enum class Error {
-		INSUFFICIENT_LENGTH = 0, // The `instructionLength` was too small
-	};
-
-	class Exception : std::exception {
-		Error error;
-
-	public:
-		explicit Exception(Error error)
-			: error(error)
-		{
-		}
-		[[nodiscard]] Error getError() const noexcept { return error; }
-	};
-
-	class Hook {
-	private:
-		std::uintptr_t original;
-		std::uintptr_t hook;
-		std::size_t instructionLength;
-
-#ifdef __x86_64
-		bool needsTrampolineJump;
-#endif
-		std::unique_ptr<ExecutableMalloc::MemoryRegion> memoryPage;
-		const MemoryManager::MemoryManager& memoryManager;
-
-		bool enabled;
-
-		std::uintptr_t trampoline;
-
-	protected:
-		static bool writeRelJmp(std::uintptr_t location, std::uintptr_t target, unsigned char* bytes)
+		static std::int32_t calculateJumpOffset(std::uintptr_t location, std::size_t instructionLength, std::uintptr_t target)
 		{
 			// Jumps always start at the ip, which has already increased.
 			// The theoretical overflow here is a non-issue as creating a hook at the end of the memory range is never going to happen.
-			location += relJmpLength;
-			// Calculation for a relative jmp
+			location += instructionLength;
+
+			// Calculation for a relative jmp:
 			std::size_t distance = detail::pointerDistance(target, location);
 			if (distance > relJmpDistance)
-				return false;
+				throw std::bad_cast{}; // Missing distance check?????
+
 			auto jmpTarget = static_cast<std::int32_t>(distance); // This cast is exactly why we need absolute jumps sometimes
+			if(jmpTarget != distance)
+				throw std::bad_cast{}; // Missing distance check?????
+
 			if (location > target) // Are we going backwards?
 				jmpTarget *= -1;
+			return jmpTarget;
+		}
+
+		static bool writeRelJmp(std::uintptr_t location, std::uintptr_t target, unsigned char* bytes)
+		{
+			std::int32_t jmpTarget = calculateJumpOffset(location, relJmpLength, target);
 			bytes[0] = '\xE9';
 			std::memcpy(bytes + 1, &jmpTarget, sizeof(std::int32_t));
 			return true;
 		}
-#ifdef __x86_64
+
 		static void writeAbsJmp(std::uintptr_t target, unsigned char* bytes)
 		{
 			bytes[0] = '\x48';
@@ -85,11 +67,47 @@ namespace DetourHooking {
 			bytes[10] = '\xFF';
 			bytes[11] = '\xE0';
 		}
-#endif
+	}
+
+	template <bool NeedsTrampoline, typename MemMgr>
+		requires MemoryManager::Reader<MemMgr> && MemoryManager::Writer<MemMgr> && (!MemMgr::RequiresPermissionsForWriting || MemoryManager::Protector<MemMgr>)
+	class Hook {
+	private:
+		std::uintptr_t original;
+		std::uintptr_t hook;
+
+		std::unique_ptr<ExecutableMalloc::MemoryRegion> memoryRegion;
+		const MemMgr& memoryManager;
+
+		bool enabled;
+
+		std::size_t instructionLength;
+		[[no_unique_address]] std::conditional_t<NeedsTrampoline, std::uintptr_t, std::unique_ptr<std::byte[]>> trampoline;
+
+		void writeJmp(std::uintptr_t location, std::uintptr_t target, std::size_t& offset, unsigned char* bytes) {
+			if constexpr(detail::Is64Bit) {
+				// If the target is too far away then we need an absolute jump
+				bool needsAbsJmp = detail::pointerDistance(location + relJmpLength, target) > relJmpDistance;
+				if (needsAbsJmp) {
+					detail::writeAbsJmp(target, bytes);
+					offset += absJmpLength;
+					return;
+				}
+			}
+
+			detail::writeRelJmp(location, target, bytes);
+			offset += relJmpLength;
+			if constexpr(detail::Is64Bit) {
+				memoryRegion->resize(memoryRegion->getTo() - memoryRegion->getFrom() - (absJmpLength - relJmpLength)); // We can now save some bytes because we made a relative jump
+			}
+
+		}
+
 	public:
 		// May throw exceptions
+		template<typename = int>
 		Hook(
-			ExecutableMalloc::MemoryManagerMemoryBlockAllocator& allocator,
+			ExecutableMalloc::MemoryManagerAllocator<MemMgr>& allocator,
 			void* original,
 			const void* hook,
 			std::size_t instructionLength)
@@ -99,48 +117,55 @@ namespace DetourHooking {
 			, memoryManager(allocator.getMemoryManager())
 		{
 			if (instructionLength < minLength) {
-				throw Exception(Error::INSUFFICIENT_LENGTH); // We won't be able to fit a near jmp
+				throw std::exception{}; // We won't be able to fit a near jmp
 			}
 
-#ifdef __x86_64
-			needsTrampolineJump = detail::pointerDistance(reinterpret_cast<std::uintptr_t>(hook), reinterpret_cast<std::uintptr_t>(original)) > relJmpDistance;
-#endif
+			// Relative jumps can only cover +/- 2 GB, if the target is too far away, we need a memory page
+			std::size_t regionSize = 0;
 
-			unsigned char bytes[
-#ifdef __x86_64
-				(needsTrampolineJump ? absJmpLength : 0) +
-#endif
-				instructionLength + relJmpLength];
-			std::size_t offset = 0;
-			std::size_t bytesLength = sizeof(bytes) / sizeof(*bytes);
+			if constexpr (detail::Is64Bit) {
+				bool needsJmpIndirection = detail::pointerDistance(reinterpret_cast<std::uintptr_t>(hook), reinterpret_cast<std::uintptr_t>(original)) > relJmpDistance;
 
-			memoryPage = allocator.getRegion(reinterpret_cast<std::uintptr_t>(original), bytesLength, memoryManager.requiresPermissionsForWriting());
-#ifdef __x86_64
-			if (needsTrampolineJump) { // Relative jumps can only cover +/- 2 GB, in case that isn't enough we write an absolute jump
-				// Maybe the memory page is just close enough to the hook that we can save some space by making a relative jump
-				bool needsAbsTrampolineJump = detail::pointerDistance(this->hook, memoryPage->getFrom()) > relJmpDistance;
-				if (needsAbsTrampolineJump) {
-					writeAbsJmp(this->hook, bytes);
-					offset += absJmpLength;
-				} else {
-					writeRelJmp(memoryPage->getFrom(), this->hook, bytes);
-					offset += relJmpLength;
-					memoryPage->resize(bytesLength - (absJmpLength - relJmpLength)); // We can now save some bytes because we can make a relative jump
+				if (needsJmpIndirection)
+					regionSize += detail::Is64Bit ? absJmpLength : relJmpLength; // For 64-bit, this could be an absolute jmp. We may later decrease the size for the region, when this turns out to be achievable with a relative jmp
+			}
+
+			if constexpr (NeedsTrampoline) {
+				regionSize += instructionLength; // The stolen bytes
+				regionSize += detail::Is64Bit ? absJmpLength : relJmpLength; // It is unlikely, but in theory the top of our block is reachable with a x64 relative jmp but the bottom isn't, we later shrink the region
+			}
+
+			if(regionSize > 0) {
+				unsigned char bytes[regionSize];
+				std::size_t offset = 0;
+
+				memoryRegion = allocator.getRegion(reinterpret_cast<std::uintptr_t>(original), regionSize, MemMgr::RequiresPermissionsForWriting);
+
+				if constexpr (detail::Is64Bit) {
+					writeJmp(memoryRegion->getFrom(), this->hook, offset, bytes);
 				}
+
+				if constexpr (NeedsTrampoline) {
+					trampoline = memoryRegion->getFrom() + offset;
+
+					memoryManager.read(this->original, bytes + offset, instructionLength); // Stolen bytes
+					offset += instructionLength;
+
+					writeJmp(memoryRegion->getFrom() + offset, this->original + instructionLength, offset, bytes + offset);
+				}
+
+				memoryManager.write(memoryRegion->getFrom(), bytes, offset);
+
+				if (memoryRegion->isWritable())
+					memoryRegion->setWritable(false);
 			}
-#endif
 
-			trampoline = memoryPage->getFrom() + offset;
+			if constexpr(!NeedsTrampoline) {
+				trampoline = std::unique_ptr<std::byte[]>(new std::byte[instructionLength]);
 
-			std::memcpy(bytes + offset, original, instructionLength); // Stolen bytes
-			offset += instructionLength;
+				memoryManager.read(this->original, trampoline.get(), instructionLength); // Stolen bytes
+			}
 
-			writeRelJmp(memoryPage->getFrom() + offset, this->original + instructionLength, bytes + offset); // Back to the original
-
-			memoryManager.write(memoryPage->getFrom(), bytes, bytesLength);
-
-			if (memoryPage->isWritable())
-				memoryPage->setWritable(false);
 			enabled = false;
 		}
 
@@ -150,14 +175,21 @@ namespace DetourHooking {
 				return;
 
 			unsigned char bytes[relJmpLength];
-#ifdef __x86_64
-			if (needsTrampolineJump)
-				writeRelJmp(original, memoryPage->getFrom(), bytes);
-			else
-#endif
-				writeRelJmp(original, hook, bytes);
+			if constexpr(detail::Is64Bit) {
+				if(memoryRegion) {
+					bool needsJmpIndirection = detail::pointerDistance(reinterpret_cast<std::uintptr_t>(hook), reinterpret_cast<std::uintptr_t>(original)) > relJmpDistance;
 
-			if (memoryManager.requiresPermissionsForWriting()) {
+					if (needsJmpIndirection) {
+						detail::writeRelJmp(original, memoryRegion->getFrom(), bytes);
+						goto write;
+					}
+				}
+			}
+
+			detail::writeRelJmp(original, hook, bytes);
+
+			write:
+			if constexpr (MemMgr::RequiresPermissionsForWriting) {
 				memoryManager.protect(detail::align(original, memoryManager.getPageGranularity()), memoryManager.getPageGranularity(), { true, true, true });
 				memoryManager.write(original, bytes, relJmpLength);
 				memoryManager.protect(detail::align(original, memoryManager.getPageGranularity()), memoryManager.getPageGranularity(), { true, false, true });
@@ -170,9 +202,20 @@ namespace DetourHooking {
 		{
 			if (!enabled)
 				return;
+			std::byte bytes[instructionLength];
 
-			mprotect(reinterpret_cast<void*>(detail::align(original, getpagesize())), getpagesize(), PROT_READ | PROT_WRITE | PROT_EXEC);
-			memcpy(reinterpret_cast<void*>(original), reinterpret_cast<const void*>(trampoline), instructionLength);
+			if constexpr (NeedsTrampoline) {
+				memoryManager.read(trampoline, bytes, instructionLength);
+			} else {
+				memcpy(bytes, trampoline.get(), instructionLength);
+			}
+
+			if constexpr (MemMgr::RequiresPermissionsForWriting) {
+				memoryManager.protect(detail::align(original, memoryManager.getPageGranularity()), memoryManager.getPageGranularity(), { true, true, true });
+				memoryManager.write(original, bytes, instructionLength);
+				memoryManager.protect(detail::align(original, memoryManager.getPageGranularity()), memoryManager.getPageGranularity(), { true, false, true });
+			} else
+				memoryManager.write(original, bytes, instructionLength);
 
 			enabled = false;
 		}
@@ -183,7 +226,11 @@ namespace DetourHooking {
 		}
 
 		[[nodiscard]] constexpr bool isEnabled() const noexcept { return enabled; }
-		[[nodiscard]] constexpr std::uintptr_t getTrampoline() const noexcept { return trampoline; }
+		[[nodiscard]] constexpr std::uintptr_t getTrampoline() const noexcept
+			requires NeedsTrampoline
+		{
+			return trampoline;
+		}
 	};
 }
 

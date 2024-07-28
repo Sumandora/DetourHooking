@@ -4,13 +4,19 @@
 
 #include "DetourHooking.hpp"
 #include "ExecutableMalloc/MemoryManagerAllocator.hpp"
-#include "MemoryManager/LocalMemoryManager.hpp"
+#include "MemoryManager/LinuxMemoryManager.hpp"
 
 typedef long (*FactorialFunc)(long);
 typedef long (*SumFunc)(long, long);
 
-DetourHooking::Hook* factorialHook;
-DetourHooking::Hook* sumHook;
+MemoryManager::LinuxMemoryManager<false, true, true> memoryManager;
+ExecutableMalloc::MemoryManagerAllocator allocator{ memoryManager };
+
+template<bool NeedsTrampoline>
+using HookT = DetourHooking::Hook<NeedsTrampoline, decltype(memoryManager)>;
+
+HookT<true>* factorialHook;
+HookT<false>* sumHook;
 
 long Factorial(long a)
 {
@@ -32,19 +38,17 @@ long MyFactorial(long a)
 
 long MySum(long a, long b)
 {
-	return reinterpret_cast<SumFunc>(sumHook->getTrampoline())(a, b) + 123;
+	return 1337;
 }
 
 int main()
 {
-	MemoryManager::LocalMemoryManager<MemoryManager::RWMode::WRITE> memoryManager;
-	ExecutableMalloc::MemoryManagerMemoryBlockAllocator allocator{ memoryManager };
 	printf("------- Hooking Factorial -------\n");
 	{
 		printf("5! = %ld\n", Factorial(5));
 		assert(120 == Factorial(5));
 
-		factorialHook = new DetourHooking::Hook(allocator, reinterpret_cast<void*>(Factorial), reinterpret_cast<void*>(MyFactorial),
+		factorialHook = new HookT<true>(allocator, reinterpret_cast<void*>(Factorial), reinterpret_cast<void*>(MyFactorial),
 #ifdef __x86_64
 			8
 #else
@@ -63,7 +67,7 @@ int main()
 		printf("2+5 = %ld\n", Sum(2, 5));
 		assert(7 == Sum(2, 5));
 
-		sumHook = new DetourHooking::Hook(allocator, reinterpret_cast<void*>(Sum), reinterpret_cast<void*>(MySum),
+		sumHook = new HookT<false>(allocator, reinterpret_cast<void*>(Sum), reinterpret_cast<void*>(MySum),
 #ifdef __x86_64
 			8
 #else
@@ -73,8 +77,8 @@ int main()
 		sumHook->enable();
 		printf("Hooked Sum\n");
 
-		printf("2+5 + 123 = %ld\n", Sum(2, 5));
-		assert(7 + 123 == Sum(2, 5));
+		printf("1337 = %ld\n", Sum(2, 5));
+		assert(1337 == Sum(2, 5));
 	}
 
 	printf("------- Disabling Hooks -------\n");

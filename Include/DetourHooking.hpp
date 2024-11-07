@@ -6,6 +6,7 @@
 #include "MemoryManager/MemoryManager.hpp"
 
 #include <algorithm>
+#include <alloca.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -47,7 +48,7 @@ namespace DetourHooking {
 				throw std::bad_cast{}; // Missing distance check?????
 
 			auto jmpTarget = static_cast<std::int32_t>(distance); // This cast is exactly why absolute jumps are needed sometimes
-			if (jmpTarget != distance)
+			if (static_cast<std::size_t>(jmpTarget) != distance) // Is the represented value still the same?
 				throw std::bad_cast{}; // Missing distance check?????
 
 			if (location > target) // Will that go backwards?
@@ -141,7 +142,7 @@ namespace DetourHooking {
 			}
 
 			if (regionSize > 0) {
-				std::uint8_t bytes[regionSize];
+				auto* bytes = static_cast<std::uint8_t*>(alloca(regionSize));
 				std::size_t offset = 0;
 
 				memoryRegion = allocator.getRegion(this->original, regionSize, MemMgr::RequiresPermissionsForWriting);

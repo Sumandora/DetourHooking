@@ -83,7 +83,7 @@ namespace DetourHooking {
 		const MemMgr* memoryManager;
 
 		std::size_t instructionLength;
-		[[no_unique_address]] std::conditional_t<NeedsTrampoline, std::uintptr_t, std::unique_ptr<std::byte[]>> trampoline;
+		std::conditional_t<NeedsTrampoline, std::uintptr_t, std::unique_ptr<std::byte[]>> trampoline;
 
 		bool enabled;
 
@@ -128,22 +128,23 @@ namespace DetourHooking {
 			std::size_t regionSize = 0;
 
 			if constexpr (detail::is64Bit) {
-				bool needsJmpIndirection = detail::pointerDistance(reinterpret_cast<std::uintptr_t>(hook), reinterpret_cast<std::uintptr_t>(original)) > relJmpDistance;
+				bool needsJmpIndirection = detail::pointerDistance(this->hook, this->original) > relJmpDistance;
 
 				if (needsJmpIndirection)
-					regionSize += absJmpLength; // For 64-bit, this could be an absolute jmp. The size for the region is later decreased, when this turns out to be achievable with a relative jmp
+					// In the case that the region is close enough to the hook, that a relative jump suffices to go from memoryRegion to hook, the region will be shrinked later.
+					regionSize += absJmpLength;
 			}
 
 			if constexpr (NeedsTrampoline) {
 				regionSize += instructionLength; // The stolen bytes
-				regionSize += detail::is64Bit ? absJmpLength : relJmpLength; // It is unlikely, but in theory the top of the block is reachable with a x64 relative jmp but the bottom isn't, the block is shrinked later anyways
+				regionSize += detail::is64Bit ? absJmpLength : relJmpLength; // It is unlikely, but in theory the top of the block is reachable with a relative jmp but the bottom isn't, the block is shrinked later anyways
 			}
 
 			if (regionSize > 0) {
 				unsigned char bytes[regionSize];
 				std::size_t offset = 0;
 
-				memoryRegion = allocator.getRegion(reinterpret_cast<std::uintptr_t>(original), regionSize, MemMgr::RequiresPermissionsForWriting);
+				memoryRegion = allocator.getRegion(this->original, regionSize, MemMgr::RequiresPermissionsForWriting);
 
 				if constexpr (detail::is64Bit) {
 					writeJmp(memoryRegion->getFrom(), this->hook, offset, bytes);

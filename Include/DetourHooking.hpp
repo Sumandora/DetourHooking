@@ -82,10 +82,10 @@ namespace DetourHooking {
 		std::unique_ptr<ExecutableMalloc::MemoryRegion> memoryRegion;
 		const MemMgr* memoryManager;
 
-		bool enabled;
-
 		std::size_t instructionLength;
 		[[no_unique_address]] std::conditional_t<NeedsTrampoline, std::uintptr_t, std::unique_ptr<std::byte[]>> trampoline;
+
+		bool enabled;
 
 		void writeJmp(std::uintptr_t location, std::uintptr_t target, std::size_t& offset, unsigned char* bytes)
 		{
@@ -131,7 +131,7 @@ namespace DetourHooking {
 				bool needsJmpIndirection = detail::pointerDistance(reinterpret_cast<std::uintptr_t>(hook), reinterpret_cast<std::uintptr_t>(original)) > relJmpDistance;
 
 				if (needsJmpIndirection)
-					regionSize += detail::is64Bit ? absJmpLength : relJmpLength; // For 64-bit, this could be an absolute jmp. The size for the region is later decreased, when this turns out to be achievable with a relative jmp
+					regionSize += absJmpLength; // For 64-bit, this could be an absolute jmp. The size for the region is later decreased, when this turns out to be achievable with a relative jmp
 			}
 
 			if constexpr (NeedsTrampoline) {

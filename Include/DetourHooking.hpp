@@ -160,8 +160,7 @@ namespace DetourHooking {
 
 				memoryManager->write(memoryRegion->getFrom(), bytes, offset);
 
-				if (memoryRegion->isWritable())
-					memoryRegion->setWritable(false);
+				memoryRegion->setWritable(false);
 			}
 
 			if constexpr (!NeedsTrampoline) {

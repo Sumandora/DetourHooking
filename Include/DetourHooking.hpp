@@ -55,7 +55,7 @@ namespace DetourHooking {
 			return jmpTarget;
 		}
 
-		inline bool writeRelJmp(std::uintptr_t location, std::uintptr_t target, unsigned char* bytes)
+		inline bool writeRelJmp(std::uintptr_t location, std::uintptr_t target, std::uint8_t* bytes)
 		{
 			std::int32_t jmpTarget = calculateJumpOffset(location, relJmpLength, target);
 			bytes[0] = '\xE9';
@@ -63,7 +63,7 @@ namespace DetourHooking {
 			return true;
 		}
 
-		inline void writeAbsJmp(std::uintptr_t target, unsigned char* bytes)
+		inline void writeAbsJmp(std::uintptr_t target, std::uint8_t* bytes)
 		{
 			bytes[0] = '\x48';
 			bytes[1] = '\xB8';
@@ -87,7 +87,7 @@ namespace DetourHooking {
 
 		bool enabled;
 
-		void writeJmp(std::uintptr_t location, std::uintptr_t target, std::size_t& offset, unsigned char* bytes)
+		void writeJmp(std::uintptr_t location, std::uintptr_t target, std::size_t& offset, std::uint8_t* bytes)
 		{
 			if constexpr (detail::is64Bit) {
 				// If the target is too far away then a absolute jump is needed
@@ -141,7 +141,7 @@ namespace DetourHooking {
 			}
 
 			if (regionSize > 0) {
-				unsigned char bytes[regionSize];
+				std::uint8_t bytes[regionSize];
 				std::size_t offset = 0;
 
 				memoryRegion = allocator.getRegion(this->original, regionSize, MemMgr::RequiresPermissionsForWriting);
@@ -178,7 +178,7 @@ namespace DetourHooking {
 			if (enabled)
 				return;
 
-			unsigned char bytes[relJmpLength];
+			std::uint8_t bytes[relJmpLength];
 			while (true) {
 				if constexpr (detail::is64Bit) {
 					if (memoryRegion) {

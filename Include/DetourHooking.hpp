@@ -179,7 +179,7 @@ namespace DetourHooking {
 			if (enabled)
 				return;
 
-			std::uint8_t bytes[relJmpLength];
+			auto* bytes = static_cast<std::uint8_t*>(alloca(relJmpLength));
 			while (true) {
 				if constexpr (detail::is64Bit) {
 					if (memoryRegion) {
@@ -210,7 +210,7 @@ namespace DetourHooking {
 		{
 			if (!enabled)
 				return;
-			std::byte bytes[instructionLength];
+			auto* bytes = static_cast<std::uint8_t*>(alloca(instructionLength));
 
 			if constexpr (NeedsTrampoline) {
 				memoryManager->read(trampoline, bytes, instructionLength);

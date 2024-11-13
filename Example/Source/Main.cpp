@@ -10,18 +10,18 @@ using FactorialFunc = int64_t (*)(int64_t);
 using SumFunc = int64_t (*)(int64_t, int64_t);
 
 // NOLINTNEXTLINE(cert-err58-cpp)
-MemoryManager::LinuxMemoryManager<false, true, true> memoryManager;
+static MemoryManager::LinuxMemoryManager<false, true, true> memoryManager;
 
 // NOLINTNEXTLINE(cert-err58-cpp)
-ExecutableMalloc::MemoryManagerAllocator allocator{ memoryManager };
+static ExecutableMalloc::MemoryManagerAllocator allocator{ memoryManager };
 
 template <bool NeedsTrampoline>
 using HookT = DetourHooking::Hook<NeedsTrampoline, decltype(memoryManager)>;
 
-HookT<true>* factorialHook;
-HookT<false>* sumHook;
+static HookT<true>* factorialHook;
+static HookT<false>* sumHook;
 
-int64_t Factorial(int64_t a)
+static int64_t Factorial(int64_t a)
 {
 	int64_t b = a;
 	for (int64_t i = 2; i < a; i++)
@@ -29,22 +29,22 @@ int64_t Factorial(int64_t a)
 	return b;
 }
 
-int64_t Sum(int64_t a, int64_t b)
+static int64_t Sum(int64_t a, int64_t b)
 {
 	return a + b;
 }
 
-int64_t MyFactorial(int64_t a)
+static int64_t MyFactorial(int64_t a)
 {
 	return reinterpret_cast<FactorialFunc>(factorialHook->getTrampoline())(a) + 123;
 }
 
-int64_t MySum(int64_t /*a*/, int64_t /*b*/)
+static int64_t MySum(int64_t /*a*/, int64_t /*b*/)
 {
 	return 1337;
 }
 
-void hookFactorial()
+static void hookFactorial()
 {
 	std::println("5! = {}", Factorial(5));
 	assert(120 == Factorial(5));
@@ -63,7 +63,7 @@ void hookFactorial()
 	assert(120 + 123 == Factorial(5));
 }
 
-void hookSum()
+static void hookSum()
 {
 	std::println("2+5 = {}", Sum(2, 5));
 	assert(7 == Sum(2, 5));
@@ -82,7 +82,7 @@ void hookSum()
 	assert(1337 == Sum(2, 5));
 }
 
-void disableHooks()
+static void disableHooks()
 {
 	factorialHook->disable();
 	sumHook->disable();
@@ -95,7 +95,7 @@ void disableHooks()
 	assert(7 == Sum(2, 5));
 }
 
-void finalizeHooks()
+static void finalizeHooks()
 {
 	std::println("Deallocating memory by finalizing both hooks");
 	delete factorialHook;

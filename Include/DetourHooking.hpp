@@ -43,7 +43,7 @@ namespace DetourHooking {
 			location += instructionLength;
 
 			// Calculation for a relative jmp:
-			std::size_t distance = detail::pointerDistance(target, location);
+			const std::size_t distance = detail::pointerDistance(target, location);
 			if (distance > relJmpDistance)
 				throw std::bad_cast{}; // Missing distance check?????
 
@@ -77,11 +77,11 @@ namespace DetourHooking {
 	template <bool NeedsTrampoline, typename MemMgr>
 		requires MemoryManager::Reader<MemMgr> && MemoryManager::Writer<MemMgr> && (!MemMgr::RequiresPermissionsForWriting || MemoryManager::Protector<MemMgr>)
 	class Hook {
+		const MemMgr* memoryManager;
+		std::unique_ptr<ExecutableMalloc::MemoryRegion> memoryRegion;
+
 		std::uintptr_t original;
 		std::uintptr_t hook;
-
-		std::unique_ptr<ExecutableMalloc::MemoryRegion> memoryRegion;
-		const MemMgr* memoryManager;
 
 		std::size_t instructionLength;
 		std::conditional_t<NeedsTrampoline, std::uintptr_t, std::unique_ptr<std::byte[]>> trampoline;
@@ -92,7 +92,7 @@ namespace DetourHooking {
 		{
 			if constexpr (detail::is64Bit) {
 				// If the target is too far away then a absolute jump is needed
-				bool needsAbsJmp = detail::pointerDistance(location + relJmpLength, target) > relJmpDistance;
+				const bool needsAbsJmp = detail::pointerDistance(location + relJmpLength, target) > relJmpDistance;
 				if (needsAbsJmp) {
 					detail::writeAbsJmp(target, bytes);
 					offset += absJmpLength;
@@ -116,10 +116,10 @@ namespace DetourHooking {
 			void* original,
 			const void* hook,
 			std::size_t instructionLength)
-			: original(reinterpret_cast<std::uintptr_t>(original))
+			: memoryManager(allocator.getMemoryManager())
+			, original(reinterpret_cast<std::uintptr_t>(original))
 			, hook(reinterpret_cast<std::uintptr_t>(hook))
 			, instructionLength(instructionLength)
-			, memoryManager(allocator.getMemoryManager())
 		{
 			if (instructionLength < minLength) {
 				throw std::exception{}; // It's impossible to fit a near jmp
@@ -183,7 +183,7 @@ namespace DetourHooking {
 			while (true) {
 				if constexpr (detail::is64Bit) {
 					if (memoryRegion) {
-						bool needsJmpIndirection = detail::pointerDistance(reinterpret_cast<std::uintptr_t>(hook), reinterpret_cast<std::uintptr_t>(original)) > relJmpDistance;
+						bool needsJmpIndirection = detail::pointerDistance(hook, original) > relJmpDistance;
 
 						if (needsJmpIndirection) {
 							detail::writeRelJmp(original, memoryRegion->getFrom(), bytes);

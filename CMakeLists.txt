@@ -14,7 +14,7 @@ if (NOT TARGET ExecutableMalloc)
     FetchContent_Declare(ExecutableMalloc
             GIT_REPOSITORY https://github.com/Sumandora/ExecutableMalloc
             GIT_PROGRESS TRUE
-            GIT_TAG 2.5)
+            GIT_TAG 2.7)
     FetchContent_MakeAvailable(ExecutableMalloc)
 endif ()
 if (NOT TARGET ExecutableMallocMemoryManager)

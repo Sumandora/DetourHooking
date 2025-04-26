@@ -75,7 +75,7 @@ namespace DetourHooking {
 	}
 
 	template <bool NeedsTrampoline, typename MemMgr>
-		requires MemoryManager::Reader<MemMgr> && MemoryManager::Writer<MemMgr> && (!MemMgr::RequiresPermissionsForWriting || MemoryManager::Protector<MemMgr>)
+		requires MemoryManager::Reader<MemMgr> && MemoryManager::Writer<MemMgr> && (!MemMgr::REQUIRES_PERMISSIONS_FOR_WRITING || MemoryManager::Protector<MemMgr>)
 	class Hook {
 		const MemMgr* memoryManager;
 		std::unique_ptr<ExecutableMalloc::MemoryRegion> memoryRegion;
@@ -103,7 +103,7 @@ namespace DetourHooking {
 			detail::writeRelJmp(location, target, bytes);
 			offset += relJmpLength;
 			if constexpr (detail::is64Bit) {
-				memoryRegion->resize(memoryRegion->getTo() - memoryRegion->getFrom() - (absJmpLength - relJmpLength)); // some bytes can be saved if a relative jump can be/is used
+				memoryRegion->resize(memoryRegion->get_to() - memoryRegion->get_from() - (absJmpLength - relJmpLength)); // some bytes can be saved if a relative jump can be/is used
 			}
 		}
 
@@ -116,7 +116,7 @@ namespace DetourHooking {
 			void* original,
 			const void* hook,
 			std::size_t instructionLength)
-			: memoryManager(allocator.getMemoryManager())
+			: memoryManager(allocator.get_memory_manager())
 			, original(reinterpret_cast<std::uintptr_t>(original))
 			, hook(reinterpret_cast<std::uintptr_t>(hook))
 			, instructionLength(instructionLength)
@@ -145,24 +145,24 @@ namespace DetourHooking {
 				auto* bytes = static_cast<std::uint8_t*>(alloca(regionSize));
 				std::size_t offset = 0;
 
-				memoryRegion = allocator.getRegion(this->original, regionSize, MemMgr::RequiresPermissionsForWriting);
+				memoryRegion = allocator.get_region(this->original, regionSize, MemMgr::REQUIRES_PERMISSIONS_FOR_WRITING);
 
 				if constexpr (detail::is64Bit) {
-					writeJmp(memoryRegion->getFrom(), this->hook, offset, bytes);
+					writeJmp(memoryRegion->get_from(), this->hook, offset, bytes);
 				}
 
 				if constexpr (NeedsTrampoline) {
-					trampoline = memoryRegion->getFrom() + offset;
+					trampoline = memoryRegion->get_from() + offset;
 
 					memoryManager->read(this->original, bytes + offset, instructionLength); // Stolen bytes
 					offset += instructionLength;
 
-					writeJmp(memoryRegion->getFrom() + offset, this->original + instructionLength, offset, bytes + offset);
+					writeJmp(memoryRegion->get_from() + offset, this->original + instructionLength, offset, bytes + offset);
 				}
 
-				memoryManager->write(memoryRegion->getFrom(), bytes, offset);
+				memoryManager->write(memoryRegion->get_from(), bytes, offset);
 
-				memoryRegion->setWritable(false);
+				memoryRegion->set_writable(false);
 			}
 
 			if constexpr (!NeedsTrampoline) {
@@ -186,7 +186,7 @@ namespace DetourHooking {
 						bool needsJmpIndirection = detail::pointerDistance(hook, original) > relJmpDistance;
 
 						if (needsJmpIndirection) {
-							detail::writeRelJmp(original, memoryRegion->getFrom(), bytes);
+							detail::writeRelJmp(original, memoryRegion->get_from(), bytes);
 							break;
 						}
 					}
@@ -196,10 +196,10 @@ namespace DetourHooking {
 				break;
 			}
 
-			if constexpr (MemMgr::RequiresPermissionsForWriting) {
-				memoryManager->protect(detail::align(original, memoryManager->getPageGranularity()), memoryManager->getPageGranularity(), { true, true, true });
+			if constexpr (MemMgr::REQUIRES_PERMISSIONS_FOR_WRITING) {
+				memoryManager->protect(detail::align(original, memoryManager->get_page_granularity()), memoryManager->get_page_granularity(), { true, true, true });
 				memoryManager->write(original, bytes, relJmpLength);
-				memoryManager->protect(detail::align(original, memoryManager->getPageGranularity()), memoryManager->getPageGranularity(), { true, false, true });
+				memoryManager->protect(detail::align(original, memoryManager->get_page_granularity()), memoryManager->get_page_granularity(), { true, false, true });
 			} else
 				memoryManager->write(original, bytes, relJmpLength);
 
@@ -218,10 +218,10 @@ namespace DetourHooking {
 				memcpy(bytes, trampoline.get(), instructionLength);
 			}
 
-			if constexpr (MemMgr::RequiresPermissionsForWriting) {
-				memoryManager->protect(detail::align(original, memoryManager->getPageGranularity()), memoryManager->getPageGranularity(), { true, true, true });
+			if constexpr (MemMgr::REQUIRES_PERMISSIONS_FOR_WRITING) {
+				memoryManager->protect(detail::align(original, memoryManager->get_page_granularity()), memoryManager->get_page_granularity(), { true, true, true });
 				memoryManager->write(original, bytes, instructionLength);
-				memoryManager->protect(detail::align(original, memoryManager->getPageGranularity()), memoryManager->getPageGranularity(), { true, false, true });
+				memoryManager->protect(detail::align(original, memoryManager->get_page_granularity()), memoryManager->get_page_granularity(), { true, false, true });
 			} else
 				memoryManager->write(original, bytes, instructionLength);
 

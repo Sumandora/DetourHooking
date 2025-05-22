@@ -114,12 +114,12 @@ namespace DetourHooking {
 
 		Hook(
 			ExecutableMalloc::MemoryManagerAllocator<MemMgr>& allocator,
-			void* original,
-			const void* hook,
+			std::uintptr_t original,
+			std::uintptr_t hook,
 			std::size_t instruction_length)
 			: memory_manager(allocator.get_memory_manager())
-			, original(reinterpret_cast<std::uintptr_t>(original))
-			, hook(reinterpret_cast<std::uintptr_t>(hook))
+			, original(original)
+			, hook(hook)
 			, instruction_length(instruction_length)
 		{
 			if (instruction_length < MIN_LENGTH) {
@@ -173,6 +173,20 @@ namespace DetourHooking {
 			}
 
 			enabled = false;
+		}
+
+		Hook(
+			ExecutableMalloc::MemoryManagerAllocator<MemMgr>& allocator,
+			void* original,
+			const void* hook,
+			std::size_t instruction_length)
+			requires(MemoryManager::LocalAware<MemMgr> && MemMgr::IS_LOCAL)
+			: Hook(
+				  allocator,
+				  reinterpret_cast<std::uintptr_t>(original),
+				  reinterpret_cast<std::uintptr_t>(hook),
+				  instruction_length)
+		{
 		}
 
 		void enable()

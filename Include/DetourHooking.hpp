@@ -3,6 +3,7 @@
 
 #include "ExecutableMalloc.hpp"
 #include "ExecutableMalloc/MemoryManagerAllocator.hpp"
+#include "LengthDisassembler/LengthDisassembler.hpp"
 #include "MemoryManager/MemoryManager.hpp"
 
 #include <algorithm>
@@ -26,6 +27,9 @@ namespace DetourHooking {
 
 	namespace detail {
 		constexpr bool IS_64_BIT = sizeof(void*) == 8;
+		constexpr LengthDisassembler::MachineMode DEFAULT_MACHINE_MODE = detail::IS_64_BIT
+			? LengthDisassembler::MachineMode::LONG_MODE
+			: LengthDisassembler::MachineMode::LONG_COMPATIBILITY_MODE;
 
 		constexpr std::uintptr_t align(std::uintptr_t addr, std::size_t alignment)
 		{
@@ -108,6 +112,19 @@ namespace DetourHooking {
 			}
 		}
 
+		static std::size_t get_stolen_bytes_count(const MemMgr* mem_mgr, std::uintptr_t address, LengthDisassembler::MachineMode machine_mode)
+		{
+			std::byte buffer[15]{};
+			mem_mgr->read(address, buffer, sizeof(buffer));
+
+			std::size_t len = 0;
+			while (len <= MIN_LENGTH) {
+				auto insn = LengthDisassembler::disassemble(buffer + len, machine_mode, sizeof(buffer));
+				len += insn.value().length;
+			}
+			return len;
+		}
+
 	public:
 		// The following functions are laid out like the life-cycle of a typical Hook (constructor + enable + disable + destructor)
 		// One is advised to read top-to-bottom
@@ -177,6 +194,15 @@ namespace DetourHooking {
 
 		Hook(
 			ExecutableMalloc::MemoryManagerAllocator<MemMgr>& allocator,
+			std::uintptr_t original,
+			std::uintptr_t hook,
+			LengthDisassembler::MachineMode machine_mode = detail::DEFAULT_MACHINE_MODE)
+			: Hook(allocator, original, hook, get_stolen_bytes_count(allocator.get_memory_manager(), original, machine_mode))
+		{
+		}
+
+		Hook(
+			ExecutableMalloc::MemoryManagerAllocator<MemMgr>& allocator,
 			void* original,
 			const void* hook,
 			std::size_t instruction_length)
@@ -186,6 +212,20 @@ namespace DetourHooking {
 				  reinterpret_cast<std::uintptr_t>(original),
 				  reinterpret_cast<std::uintptr_t>(hook),
 				  instruction_length)
+		{
+		}
+
+		Hook(
+			ExecutableMalloc::MemoryManagerAllocator<MemMgr>& allocator,
+			void* original,
+			const void* hook,
+			LengthDisassembler::MachineMode machine_mode = detail::DEFAULT_MACHINE_MODE)
+			requires(MemoryManager::LocalAware<MemMgr> && MemMgr::IS_LOCAL)
+			: Hook(
+				  allocator,
+				  reinterpret_cast<std::uintptr_t>(original),
+				  reinterpret_cast<std::uintptr_t>(hook),
+				  machine_mode)
 		{
 		}
 

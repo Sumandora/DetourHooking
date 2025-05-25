@@ -49,13 +49,7 @@ static void hook_factorial()
 	std::println("5! = {}", factorial(5));
 	assert(120 == factorial(5));
 
-	factorial_hook = new HookT<true>(allocator, reinterpret_cast<void*>(factorial), reinterpret_cast<void*>(my_factorial),
-#ifdef __x86_64
-		8
-#else
-		6
-#endif
-	);
+	factorial_hook = new HookT<true>(allocator, reinterpret_cast<void*>(factorial), reinterpret_cast<void*>(my_factorial));
 	factorial_hook->enable();
 	std::println("Hooked Factorial");
 
@@ -68,13 +62,7 @@ static void hook_sum()
 	std::println("2+5 = {}", sum(2, 5));
 	assert(7 == sum(2, 5));
 
-	sum_hook = new HookT<false>(allocator, reinterpret_cast<void*>(sum), reinterpret_cast<void*>(my_sum),
-#ifdef __x86_64
-		8
-#else
-		6
-#endif
-	);
+	sum_hook = new HookT<false>(allocator, reinterpret_cast<void*>(sum), reinterpret_cast<void*>(my_sum));
 	sum_hook->enable();
 	std::println("Hooked Sum");
 

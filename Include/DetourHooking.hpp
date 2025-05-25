@@ -114,7 +114,7 @@ namespace DetourHooking {
 
 		static std::size_t get_stolen_bytes_count(const MemMgr* mem_mgr, std::uintptr_t address, LengthDisassembler::MachineMode machine_mode)
 		{
-			std::byte buffer[15]{};
+			std::byte buffer[LengthDisassembler::MAX_INSTRUCTION_LENGTH]{};
 			mem_mgr->read(address, buffer, sizeof(buffer));
 
 			std::size_t len = 0;

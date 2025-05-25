@@ -88,7 +88,7 @@ namespace DetourHooking {
 		std::uintptr_t original;
 		std::uintptr_t hook;
 
-		std::size_t instruction_length;
+		std::size_t stolen_bytes_count;
 		std::conditional_t<NeedsTrampoline, std::uintptr_t, std::unique_ptr<std::byte[]>> trampoline;
 
 		bool enabled;
@@ -133,13 +133,13 @@ namespace DetourHooking {
 			ExecutableMalloc::MemoryManagerAllocator<MemMgr>& allocator,
 			std::uintptr_t original,
 			std::uintptr_t hook,
-			std::size_t instruction_length)
+			std::size_t stolen_bytes_count)
 			: memory_manager(allocator.get_memory_manager())
 			, original(original)
 			, hook(hook)
-			, instruction_length(instruction_length)
+			, stolen_bytes_count(stolen_bytes_count)
 		{
-			if (instruction_length < MIN_LENGTH) {
+			if (stolen_bytes_count < MIN_LENGTH) {
 				throw std::exception{}; // It's impossible to fit a near jump
 			}
 
@@ -155,7 +155,7 @@ namespace DetourHooking {
 			}
 
 			if constexpr (NeedsTrampoline) {
-				region_size += instruction_length; // The stolen bytes
+				region_size += stolen_bytes_count; // The stolen bytes
 				region_size += detail::IS_64_BIT ? ABS_JMP_LENGTH : REL_JMP_LENGTH; // It is unlikely, but in theory the top of the block is reachable with a relative jump but the bottom isn't, the block is shrinked later anyways
 			}
 
@@ -172,10 +172,10 @@ namespace DetourHooking {
 				if constexpr (NeedsTrampoline) {
 					trampoline = memory_region->get_from() + offset;
 
-					memory_manager->read(this->original, bytes + offset, instruction_length); // Stolen bytes
-					offset += instruction_length;
+					memory_manager->read(this->original, bytes + offset, stolen_bytes_count); // Stolen bytes
+					offset += stolen_bytes_count;
 
-					write_jmp(memory_region->get_from() + offset, this->original + instruction_length, offset, bytes + offset);
+					write_jmp(memory_region->get_from() + offset, this->original + stolen_bytes_count, offset, bytes + offset);
 				}
 
 				memory_manager->write(memory_region->get_from(), bytes, offset);
@@ -184,9 +184,9 @@ namespace DetourHooking {
 			}
 
 			if constexpr (!NeedsTrampoline) {
-				trampoline = std::unique_ptr<std::byte[]>(new std::byte[instruction_length]);
+				trampoline = std::unique_ptr<std::byte[]>(new std::byte[stolen_bytes_count]);
 
-				memory_manager->read(this->original, trampoline.get(), instruction_length); // Stolen bytes
+				memory_manager->read(this->original, trampoline.get(), stolen_bytes_count); // Stolen bytes
 			}
 
 			enabled = false;
@@ -205,13 +205,13 @@ namespace DetourHooking {
 			ExecutableMalloc::MemoryManagerAllocator<MemMgr>& allocator,
 			void* original,
 			const void* hook,
-			std::size_t instruction_length)
+			std::size_t stolen_bytes_count)
 			requires(MemoryManager::LocalAware<MemMgr> && MemMgr::IS_LOCAL)
 			: Hook(
 				  allocator,
 				  reinterpret_cast<std::uintptr_t>(original),
 				  reinterpret_cast<std::uintptr_t>(hook),
-				  instruction_length)
+				  stolen_bytes_count)
 		{
 		}
 
@@ -265,20 +265,20 @@ namespace DetourHooking {
 		{
 			if (!enabled)
 				return;
-			auto* bytes = static_cast<std::uint8_t*>(alloca(instruction_length));
+			auto* bytes = static_cast<std::uint8_t*>(alloca(stolen_bytes_count));
 
 			if constexpr (NeedsTrampoline) {
-				memory_manager->read(trampoline, bytes, instruction_length);
+				memory_manager->read(trampoline, bytes, stolen_bytes_count);
 			} else {
-				memcpy(bytes, trampoline.get(), instruction_length);
+				memcpy(bytes, trampoline.get(), stolen_bytes_count);
 			}
 
 			if constexpr (MemMgr::REQUIRES_PERMISSIONS_FOR_WRITING) {
 				memory_manager->protect(detail::align(original, memory_manager->get_page_granularity()), memory_manager->get_page_granularity(), { true, true, true });
-				memory_manager->write(original, bytes, instruction_length);
+				memory_manager->write(original, bytes, stolen_bytes_count);
 				memory_manager->protect(detail::align(original, memory_manager->get_page_granularity()), memory_manager->get_page_granularity(), { true, false, true });
 			} else
-				memory_manager->write(original, bytes, instruction_length);
+				memory_manager->write(original, bytes, stolen_bytes_count);
 
 			enabled = false;
 		}

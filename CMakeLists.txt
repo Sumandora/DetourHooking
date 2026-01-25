@@ -14,7 +14,7 @@ if (NOT TARGET ExecutableMalloc)
     FetchContent_Declare(ExecutableMalloc
             GIT_REPOSITORY https://github.com/Sumandora/ExecutableMalloc
             GIT_PROGRESS TRUE
-            GIT_TAG 2.9)
+            GIT_TAG 2.10)
     FetchContent_MakeAvailable(ExecutableMalloc)
 endif ()
 if (NOT TARGET ExecutableMallocMemoryManager)
@@ -26,7 +26,7 @@ if (NOT TARGET LengthDisassembler)
     FetchContent_Declare(LengthDisassembler
             GIT_REPOSITORY https://github.com/Sumandora/LengthDisassembler
             GIT_PROGRESS TRUE
-            GIT_TAG 1.0.1)
+            GIT_TAG 1.0.2)
     FetchContent_MakeAvailable(LengthDisassembler)
 endif ()
 target_link_libraries(DetourHooking INTERFACE LengthDisassembler)
